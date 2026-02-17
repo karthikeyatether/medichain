@@ -62,6 +62,18 @@ Before running the project, ensure you have the following installed:
     ```
     This will compile and deploy the `MediChain` contract to your local blockchain.
 
+## System Model
+
+### Class Diagram
+The application architecture is centered around the `MediChain` smart contract, which manages the state and interactions between Patients, Doctors, and Insurers.
+
+![Class Diagram](client/public/assets/diagrams/class_diagram.png)
+
+### Activity Diagram: Patient Interaction
+This diagram illustrates the process of user authentication and interaction with the MediChain system.
+
+![Activity Diagram](client/public/assets/diagrams/activity_diagram.png)
+
 ## Running the Application
 
 You can start the application using the provided batch script or manually.
