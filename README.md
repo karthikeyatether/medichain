@@ -37,29 +37,23 @@ Before running the project, ensure you have the following installed:
     cd mediChain
     ```
 
-2.  **Install Dependencies**
-
-    *   **Smart Contracts (Truffle)**:
-        ```bash
-        cd truffle
-        npm install
-        ```
-    *   **Client (React)**:
-        ```bash
-        cd ../client
-        npm install
-        ```
-
-3.  **Configure Blockchain**
-    *   Open **Ganache** and create a new workspace (or use Quickstart).
-    *   Ensure Ganache is running on `127.0.0.1:7545` (default) or update `truffle-config.js` in the `truffle` folder to match your port.
-    *   Import a few accounts from Ganache into **Metamask** using their private keys.
-
-4.  **Deploy Smart Contracts**
-    In the `truffle` directory, run:
+3.  **Install Dependencies**
     ```bash
-    truffle migrate --reset
+    npm install
+    npm run client:install
+    npm run truffle:install
     ```
+
+4.  **Start Ganache**
+    *   Open **Ganache** and create a new workspace (or use Quickstart).
+    *   Ensure Ganache is running on `127.0.0.1:7545` (default).
+
+5.  **Deploy Contracts & Start App**
+    ```bash
+    npm run truffle:migrate
+    npm run client:start
+    ```
+    This will deploy the smart contracts and launch the React application at `http://localhost:3000`.
     This will compile and deploy the `MediChain` contract to your local blockchain.
 
 ## System Model
