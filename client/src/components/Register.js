@@ -1,98 +1,142 @@
-import { useEffect, useState } from 'react';
-import { Button, Form } from 'react-bootstrap';
-import { Buffer } from 'buffer';
+import React, { useState } from 'react';
+import { Container, Row, Col, Form, Button, Alert } from 'react-bootstrap';
+import { useNavigate, Link } from 'react-router-dom';
 
-const Register = ({mediChain, ipfs, connectWallet, token, account, setToken, setAccount}) => {
-    const [designation, setDesignation] = useState("1");
+const Register = ({ mediChain, setToken, setAccount, connectWallet, account }) => {
+    const navigate = useNavigate();
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    // Form States
+    const [role, setRole] = useState("1");
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
-    const [age, setAge] = useState('');
+    const [age, setAge] = useState("");
 
-    const handleSubmit = (e) => {
+    const handleRegister = async (e) => {
         e.preventDefault();
-        if(account!=="" && designation==="1"){
-            var record = Buffer(JSON.stringify({
-                name: name,
-                email: email,
-                address: account,
-                age: age,
-                treatments: []
-            }));
-            ipfs.add(record).then((result, error) => {
-                if(error){
-                    console.log(error);
-                    return;
-                }else{
-                    mediChain.methods.register(name, age, parseInt(designation), email, result.path).send({from: account}).on('transactionHash', async (hash) => {
-                        window.location.href = '/login'
-                    })
-                }
-            })
-        }else if(account!==""){
-            mediChain.methods.register(name, 0, parseInt(designation), email, "").send({from: account}).on('transactionHash', async (hash) => {
-                window.location.href = '/login'
-            })
-        }
-    }
+        setLoading(true);
+        setError('');
 
-    useEffect(() => {
-        var t = localStorage.getItem('token')
-        var a = localStorage.getItem('account')
-        t = t ? t : ""
-        a = a ? a : ""
-        if(t!=="" && a!=="") window.location.href = '/login';
-        else{
-            localStorage.removeItem('token')
-            localStorage.removeItem('account')
-            setToken('');
-            setAccount('');
+        try {
+            if (!mediChain) throw new Error("Blockchain not connected");
+
+            // Smart Contract: register(string _name, uint _age, uint _designation, string _email, string _hash)
+            // For Patient (_designation 1), _hash must be > 0 length. usage: "init"
+            const hash = role === "1" ? "init" : "";
+
+            await mediChain.methods.register(name, parseInt(age), role, email, hash).send({ from: account });
+            // Add Insurer logic if applicable in contract
+
+            // Auto login after register
+            setToken(role);
+            localStorage.setItem('token', role);
+            localStorage.setItem('account', account);
+            navigate('/dashboard');
+
+        } catch (err) {
+            console.error(err);
+            setError("Registration failed. Ensure you are connected and transaction is approved.");
+        } finally {
+            setLoading(false);
         }
-    }, [token])
+    };
 
     return (
-        <div className='register'>
-            <div className='box'>
-                <h2>Register</h2>
-                <br />
-                <Form onSubmit={handleSubmit}>
-                    <Form.Group className="mb-3" controlId="formWallet">
-                        <Form.Label>Connect Wallet</Form.Label>
-                        { account === "" ?
-                        <Form.Control type="button" value="Connect to Metamask" onClick={connectWallet}/>
-                        : <Form.Control type="button" disabled value={`Connected Wallet with Address: ${account}`}/>
-                        }
-                    </Form.Group>
-                    <Form.Group className="mb-3" controlId="formDesignation">
-                        <Form.Label>Designation</Form.Label>
-                        <Form.Select onChange={(e) => setDesignation(e.target.value)} value={designation}>
-                            <option value="1">Patient</option>
-                            <option value="2">Doctor</option>
-                            <option value="3">Insurance Provider</option>
-                        </Form.Select>
-                    </Form.Group>
-                    <Form.Group className="mb-3" controlId="formName">
-                        <Form.Label>Name</Form.Label>
-                        <Form.Control required type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Enter your name" />
-                    </Form.Group>
-                    <Form.Group className="mb-3" controlId="formEmail">
-                        <Form.Label>Email</Form.Label>
-                        <Form.Control required type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Enter your email" />
-                    </Form.Group>
-                    { designation==="1" ?
-                    <Form.Group className="mb-3" controlId="formAge">
-                        <Form.Label>Age</Form.Label>
-                        <Form.Control type="number" value={age} min={18} onChange={(e) => setAge(e.target.value)} placeholder="Enter your age" />
-                    </Form.Group>
-                    : <></>
-                    }
-                    <Button variant="coolColor" type="submit">
-                        Submit
-                    </Button>
-                </Form>
-            </div>
+        <div className="auth-wrapper overflow-hidden position-relative">
+            <div className="blob blob-1"></div>
+            <div className="blob blob-2"></div>
+            <div className="blob blob-3"></div>
+            <Container className="position-relative" style={{ zIndex: 2 }}>
+                <Row className="justify-content-center">
+                    <Col md={8} lg={6} className="auth-card">
+                        <div className="glass-card">
+                            <div className="text-center mb-2">
+                                <h2 className="fw-bold text-primary">Create Account</h2>
+                                <p className="text-muted small mb-0">Join the secure healthcare network</p>
+                            </div>
+
+                            {error && <Alert variant="danger" className="border-0 shadow-sm mb-3">{error}</Alert>}
+
+                            {!account ? (
+                                <div className="text-center mt-3">
+                                    <p className="mb-3 text-muted">Connect wallet to verify identity.</p>
+                                    <Button onClick={connectWallet} variant="primary" size="lg" className="w-100 rounded-pill shadow-sm">
+                                        Connect Metamask 🦊
+                                    </Button>
+                                </div>
+                            ) : (
+                                <Form onSubmit={handleRegister}>
+                                    <Form.Group className="form-group">
+                                        <Form.Label className="form-label">I am a</Form.Label>
+                                        <Form.Select
+                                            className="form-control"
+                                            value={role}
+                                            onChange={(e) => setRole(e.target.value)}
+                                        >
+                                            <option value="1">Patient</option>
+                                            <option value="2">Doctor</option>
+                                        </Form.Select>
+                                    </Form.Group>
+
+                                    <Form.Group className="form-group">
+                                        <Form.Label className="form-label">Full Name</Form.Label>
+                                        <Form.Control
+                                            type="text"
+                                            placeholder="Enter your name"
+                                            value={name}
+                                            onChange={(e) => setName(e.target.value)}
+                                            required
+                                            className="form-control"
+                                        />
+                                    </Form.Group>
+
+                                    <Form.Group className="form-group">
+                                        <Form.Label className="form-label">Email Address</Form.Label>
+                                        <Form.Control
+                                            type="email"
+                                            placeholder="Enter your email"
+                                            value={email}
+                                            onChange={(e) => setEmail(e.target.value)}
+                                            required
+                                            className="form-control"
+                                        />
+                                    </Form.Group>
+
+                                    <Form.Group className="form-group">
+                                        <Form.Label className="form-label">Age</Form.Label>
+                                        <Form.Control
+                                            type="number"
+                                            placeholder="Enter your age"
+                                            value={age}
+                                            onChange={(e) => setAge(e.target.value)}
+                                            required
+                                            className="form-control"
+                                        />
+                                    </Form.Group>
+
+                                    <Button
+                                        type="submit"
+                                        variant="primary"
+                                        disabled={loading}
+                                        className="w-100 rounded-pill py-3 fw-bold mt-2 shadow-md"
+                                    >
+                                        {loading ? 'Creating Identity...' : 'Register Account'}
+                                    </Button>
+                                </Form>
+                            )}
+
+                            <div className="text-center mt-4 pt-3 border-top">
+                                <small className="text-muted">
+                                    Already have an account? <Link to="/login" className="fw-bold text-secondary">Login Here</Link>
+                                </small>
+                            </div>
+                        </div>
+                    </Col>
+                </Row>
+            </Container>
         </div>
-    )
-}
+    );
+};
 
-
-export default Register
+export default Register;
