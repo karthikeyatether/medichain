@@ -12,21 +12,17 @@ const Login = ({ mediChain, setToken, setAccount, connectWallet, account }) => {
         if (!mediChain || !account) return;
         setLoading(true);
         try {
-            const patient = await mediChain.methods.patientInfo(account).call();
-            if (patient && patient.exists) {
-                loginUser("1");
-                return;
-            }
-            const doctor = await mediChain.methods.doctorInfo(account).call();
-            if (doctor && doctor.exists) {
-                loginUser("2");
-                return;
-            }
-            const insurer = await mediChain.methods.insurerInfo(account).call();
-            if (insurer && insurer.exists) {
-                loginUser("3");
-                return;
-            }
+            const normalizedAccount = account.toLowerCase();
+            const [patient, doctor, insurer] = await Promise.all([
+                mediChain.methods.patientInfo(normalizedAccount).call().catch(() => null),
+                mediChain.methods.doctorInfo(normalizedAccount).call().catch(() => null),
+                mediChain.methods.insurerInfo(normalizedAccount).call().catch(() => null)
+            ]);
+
+            if (patient && patient.exists) return loginUser("1");
+            if (doctor && doctor.exists) return loginUser("2");
+            if (insurer && insurer.exists) return loginUser("3");
+
             // If no role found, stay on login page
             setLoading(false);
         } catch (error) {
@@ -51,8 +47,36 @@ const Login = ({ mediChain, setToken, setAccount, connectWallet, account }) => {
 
     const handleLogin = async (e) => {
         e.preventDefault();
-        // Fallback manual login if auto-login didn't redirect (e.g. unregistered or error)
-        loginUser(role);
+        if (!mediChain || !account) return;
+        setLoading(true);
+        setError('');
+        try {
+            let exists = false;
+            const normalizedAccount = account.toLowerCase();
+            if (role === "1") {
+                const res = await mediChain.methods.patientInfo(normalizedAccount).call().catch(() => null);
+                exists = res && res.exists;
+            } else if (role === "2") {
+                const res = await mediChain.methods.doctorInfo(normalizedAccount).call().catch(() => null);
+                exists = res && res.exists;
+            } else if (role === "3") {
+                const res = await mediChain.methods.insurerInfo(normalizedAccount).call().catch(() => null);
+                exists = res && res.exists;
+            }
+
+            if (exists) {
+                loginUser(role);
+            } else {
+                setError(`Your wallet is not registered as a ${role === "1" ? "Patient" : role === "2" ? "Doctor" : "Insurer"}.`);
+                setLoading(false);
+            }
+        } catch (err) {
+            console.error("LOGIN ERROR STACK:", err);
+            console.log("LOGIN MEDICHAIN CONTRACT:", mediChain);
+            console.log("LOGIN ACCOUNT:", account);
+            setError("Login failed. Verify your connection. See console for details.");
+            setLoading(false);
+        }
     };
 
     return (

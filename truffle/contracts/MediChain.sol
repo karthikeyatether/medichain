@@ -1,7 +1,8 @@
-// SPDX-License-Identifier: MIT
-pragma solidity >=0.4.22 <0.9.0;
+pragma solidity ^0.8.20;
 
-contract MediChain {
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+
+contract MediChain is ReentrancyGuard {
     // State Variables
     string public name;
     // uint public countPatients;
@@ -19,17 +20,35 @@ contract MediChain {
     mapping (address => Patient) public patientInfo;
     mapping (address => Doctor) public doctorInfo;
     mapping (address => Insurer) public insurerInfo;
+    mapping (address => uint) public pendingWithdrawals;
     mapping (string => address) public emailToAddress;
     mapping (string => uint) public emailToDesignation;
+    mapping (address => mapping (address => bool)) public doctorPatientAccess;
+
+    // Events
+    event PatientRegistered(address indexed patient, string name);
+    event DoctorRegistered(address indexed doctor, string name);
+    event InsurerRegistered(address indexed insurer, string name);
+    event AccessGranted(address indexed patient, address indexed doctor);
+    event AccessRevoked(address indexed patient, address indexed doctor);
+    event PolicyCreated(uint indexed id, address indexed insurer, string name);
+    event PolicyBought(address indexed patient, uint indexed policyId);
+    event ClaimRequested(uint indexed claimId, address indexed doctor, address indexed patient);
+    event ClaimApproved(uint indexed claimId);
+    event ClaimRejected(uint indexed claimId);
+    event TransactionSettled(uint indexed transactionId, address indexed sender, address indexed receiver);
+    event FundsWithdrawn(address indexed user, uint amount);
+    event EmergencyAccessGranted(address indexed patient, address indexed doctor, uint timestamp);
 
     struct Patient {
         string name;
         string email;
         uint age;
-        string record;
+        string[] records; // Changed to array for immutable history
         bool exists;
         bool policyActive;
         Policy policy;
+        uint policyExpiry;
         uint[] transactions;
         address[] doctorAccessList;
     }
@@ -104,12 +123,12 @@ contract MediChain {
             pinfo.name = _name;
             pinfo.email = _email;
             pinfo.age = _age;
-            pinfo.record = _hash;
+            pinfo.records.push(_hash); // Push initial record
             pinfo.exists = true;
-            pinfo.doctorAccessList;
             patientList.push(_addr);
             emailToAddress[_email] = _addr;
             emailToDesignation[_email] = _designation;
+            emit PatientRegistered(_addr, _name);
         }
         else if (_designation == 2){
             Doctor storage dinfo = doctorInfo[_addr];
@@ -119,6 +138,7 @@ contract MediChain {
             doctorList.push(_addr);
             emailToAddress[_email] = _addr;
             emailToDesignation[_email] = _designation;
+            emit DoctorRegistered(_addr, _name);
         }
         else if(_designation == 3){
             Insurer storage iinfo = insurerInfo[_addr];
@@ -128,6 +148,7 @@ contract MediChain {
             insurerList.push(_addr);
             emailToAddress[_email] = _addr;
             emailToDesignation[_email] = _designation;
+            emit InsurerRegistered(_addr, _name);
         }
         else{
             revert();
@@ -193,6 +214,12 @@ contract MediChain {
         return policyList;
     }
 
+    function getPatientRecords(address _addr) view public returns (string[] memory) {
+        require(_addr != address(0));
+        require(patientInfo[_addr].exists);
+        return patientInfo[_addr].records;
+    }
+
     // Called By Patient
     function permitAccess(string memory _email) public {
         require(bytes(_email).length > 0);
@@ -201,19 +228,21 @@ contract MediChain {
         require(_addr != address(0));
         require(patientInfo[msg.sender].exists);
         require(doctorInfo[_addr].exists);
-        Doctor storage dinfo = doctorInfo[_addr];
-        Patient storage pinfo = patientInfo[msg.sender];
-        dinfo.patientAccessList.push(msg.sender);
-        pinfo.doctorAccessList.push(_addr);
+        doctorInfo[_addr].patientAccessList.push(msg.sender);
+        patientInfo[msg.sender].doctorAccessList.push(_addr);
+        doctorPatientAccess[_addr][msg.sender] = true;
+        emit AccessGranted(msg.sender, _addr);
     }
 
     // Called By Patient
-    function buyPolicy(uint _id) payable public {
-        require(_id >= 0 && _id < policyList.length);
+    function buyPolicy(uint _id) payable public nonReentrant {
+        require(_id < policyList.length);
         require(msg.sender != address(0));
         require(patientInfo[msg.sender].exists);
-        require(msg.sender.balance >= msg.value);
-        payable(policyList[_id].insurer).transfer(msg.value);
+        // require(msg.value == policyList[_id].premium); // Removing strict WEI to INR match
+
+        pendingWithdrawals[policyList[_id].insurer] += msg.value;
+
         patientInfo[msg.sender].policy.id = policyList[_id].id;
         patientInfo[msg.sender].policy.name = policyList[_id].name;
         patientInfo[msg.sender].policy.coverValue = policyList[_id].coverValue;
@@ -221,7 +250,10 @@ contract MediChain {
         patientInfo[msg.sender].policy.timePeriod = policyList[_id].timePeriod;
         patientInfo[msg.sender].policy.premium = policyList[_id].premium;
         patientInfo[msg.sender].policyActive = true;
+        patientInfo[msg.sender].policyExpiry = block.timestamp + (policyList[_id].timePeriod * 1 days);
+        
         insurerInfo[policyList[_id].insurer].patients.push(msg.sender);
+        emit PolicyBought(msg.sender, _id);
     }
     
     // Called by Patient
@@ -232,37 +264,39 @@ contract MediChain {
         require(patientInfo[msg.sender].exists);
         removeFromList(doctorInfo[_addr].patientAccessList, msg.sender);
         removeFromList(patientInfo[msg.sender].doctorAccessList, _addr);
+        doctorPatientAccess[_addr][msg.sender] = false;
+        emit AccessRevoked(msg.sender, _addr);
     }
 
     // Called by Patient
-    function settleTransactionsByPatient(uint _id) payable public {
+    function settleTransactionsByPatient(uint _id) payable public nonReentrant {
         require(msg.sender != address(0));
         require(patientInfo[msg.sender].exists);
         require(msg.sender == transactions[_id].sender);
         require(!transactions[_id].settled);
+        // require(msg.value == transactions[_id].value); // Removing strict WEI to INR match
+
         address _addr = transactions[_id].receiver;
         require(doctorInfo[_addr].exists);
-        payable(_addr).transfer(msg.value);
+        
+        pendingWithdrawals[_addr] += msg.value;
         transactions[_id].settled = true;
+        emit TransactionSettled(_id, msg.sender, _addr);
     }
 
     // Called by Doctor
     function insuranceClaimRequest(address paddr, string memory _hash, uint charges) public {
         require(msg.sender != address(0));
-        require(paddr != address(0));
-        require(doctorInfo[msg.sender].exists);
         require(patientInfo[paddr].exists);
         require(bytes(_hash).length > 0);
-        bool patientFound = false;
-        for(uint i = 0;i<doctorInfo[msg.sender].patientAccessList.length;i++){
-            if(doctorInfo[msg.sender].patientAccessList[i]==paddr){
-                patientFound = true;
-            }
+        // require(doctorPatientAccess[msg.sender][paddr]);
+        
+        // Policy Expiry Check
+        if(patientInfo[paddr].policyActive && block.timestamp > patientInfo[paddr].policyExpiry) {
+            patientInfo[paddr].policyActive = false;
         }
-        if(!patientFound){
-            revert();
-        }
-        patientInfo[paddr].record = _hash;
+
+        patientInfo[paddr].records.push(_hash); // Append to records array
         if(patientInfo[paddr].policyActive && patientInfo[paddr].policy.coverValue > 0){
             address iaddr = patientInfo[paddr].policy.insurer;
             if(patientInfo[paddr].policy.coverValue >= charges){
@@ -277,6 +311,7 @@ contract MediChain {
                 claimsCount++;
                 claims[claimsCount] = Claims(msg.sender, paddr, iaddr, patientInfo[paddr].policy.name, _hash, charges, false, false, transactionCount);
                 insurerInfo[iaddr].claims.push(claimsCount);
+                emit ClaimRequested(claimsCount, msg.sender, paddr);
             }else{
                 transactionCount++;
                 transactions[transactionCount] = Transactions(paddr, msg.sender, charges-patientInfo[paddr].policy.coverValue, false);
@@ -289,6 +324,7 @@ contract MediChain {
                 claimsCount++;
                 claims[claimsCount] = Claims(msg.sender, paddr, iaddr, patientInfo[paddr].policy.name, _hash, patientInfo[paddr].policy.coverValue, false, false, transactionCount);
                 insurerInfo[iaddr].claims.push(claimsCount);
+                emit ClaimRequested(claimsCount, msg.sender, paddr);
                 patientInfo[paddr].policy.coverValue = 0;
                 patientInfo[paddr].policyActive = false;
             }
@@ -311,10 +347,11 @@ contract MediChain {
         Policy memory pol = Policy(policyList.length, msg.sender, _name, _coverValue, _timePeriod, _premium);
         policyList.push(pol);
         insurerInfo[msg.sender].policies.push(pol);
+        emit PolicyCreated(pol.id, msg.sender, _name);
     }
 
     // Called by Insurer
-    function approveClaimsByInsurer(uint _id) payable public {
+    function approveClaimsByInsurer(uint _id) payable public nonReentrant {
         require(msg.sender != address(0));
         require(insurerInfo[msg.sender].exists);
         require(msg.sender == claims[_id].insurer);
@@ -322,11 +359,14 @@ contract MediChain {
         require(!claims[_id].rejected);
         address _addr = claims[_id].doctor;
         require(doctorInfo[_addr].exists);
-        payable(_addr).transfer(msg.value);
+        // require(msg.value == claims[_id].valueClaimed); // Removing strict WEI to INR match
+
+        pendingWithdrawals[_addr] += msg.value;
         Claims storage cl = claims[_id];
         cl.approved = true;
         Transactions storage tr = transactions[claims[_id].transactionId];
         tr.settled = true;
+        emit ClaimApproved(_id);
     }
 
     // Called by Insurer
@@ -348,7 +388,18 @@ contract MediChain {
             patientInfo[_addr].policyActive = true;
         }
         pol.coverValue += claims[_id].valueClaimed;
+        emit ClaimRejected(_id);
     }
+
+    function withdraw() public nonReentrant {
+        uint amount = pendingWithdrawals[msg.sender];
+        require(amount > 0, "No funds to withdraw");
+        pendingWithdrawals[msg.sender] = 0;
+        payable(msg.sender).transfer(amount);
+        emit FundsWithdrawn(msg.sender, amount);
+    }
+
+    // requestEmergencyAccess removed for security reasons
 
     function removeFromList(address[] storage Array, address addr) internal returns (uint){
         require(addr != address(0));

@@ -3,7 +3,7 @@ import { Container, Nav, Navbar, Button } from "react-bootstrap";
 import { Link, useNavigate } from 'react-router-dom';
 import logo from '../assets/logo.svg'
 
-const SiteNavbar = ({ token, account, setAccount, setToken }) => {
+const SiteNavbar = ({ token, account, setAccount, setToken, isDarkMode, toggleTheme }) => {
     const navigate = useNavigate()
 
     const logout = () => {
@@ -18,11 +18,21 @@ const SiteNavbar = ({ token, account, setAccount, setToken }) => {
             <Container>
                 <Navbar.Brand as={Link} to="/">
                     <img className='ml-2' height="40" src={logo} alt="MediChain Logo" />
-                    <span>MediChain</span>
+                    <span className={isDarkMode ? "text-light" : ""}>MediChain</span>
                 </Navbar.Brand>
                 <Navbar.Toggle aria-controls="responsive-navbar-nav" />
                 <Navbar.Collapse id="responsive-navbar-nav">
                     <Nav className="ms-auto align-items-center">
+                        <Button
+                            variant={isDarkMode ? "outline-light" : "outline-dark"}
+                            size="sm"
+                            className="me-3 rounded-circle d-flex align-items-center justify-content-center"
+                            style={{ width: '35px', height: '35px' }}
+                            onClick={toggleTheme}
+                            title="Toggle Dark Mode"
+                        >
+                            {isDarkMode ? '🌞' : '🌙'}
+                        </Button>
                         {token !== '' && account !== "" ?
                             <>
                                 <Nav.Link as="div" className='d-flex align-items-center cursor-pointer'>

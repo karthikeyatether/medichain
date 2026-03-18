@@ -21,21 +21,48 @@ const Register = ({ mediChain, setToken, setAccount, connectWallet, account }) =
         try {
             if (!mediChain) throw new Error("Blockchain not connected");
 
+            // 1. Check if email is already in use
+            const existingAddress = await mediChain.methods.emailToAddress(email).call().catch(() => "0x0000000000000000000000000000000000000000");
+            if (existingAddress !== "0x0000000000000000000000000000000000000000") {
+                setError("This email is already registered to an account.");
+                setLoading(false);
+                return;
+            }
+
             // Smart Contract: register(string _name, uint _age, uint _designation, string _email, string _hash)
             // For Patient (_designation 1), _hash must be > 0 length. usage: "init"
             const hash = role === "1" ? "init" : "";
+            const normalizedAccount = account.toLowerCase();
 
-            await mediChain.methods.register(name, parseInt(age), role, email, hash).send({ from: account });
-            // Add Insurer logic if applicable in contract
+            await mediChain.methods.register(name, parseInt(age || "0"), role, email, hash).send({ from: normalizedAccount });
 
-            // Auto login after register
+            // 2. Verify registration actually succeeded (in case of silent Ganache revert)
+            let exists = false;
+            if (role === "1") {
+                const res = await mediChain.methods.patientInfo(normalizedAccount).call().catch(() => null);
+                exists = res && res.exists;
+            } else if (role === "2") {
+                const res = await mediChain.methods.doctorInfo(normalizedAccount).call().catch(() => null);
+                exists = res && res.exists;
+            } else if (role === "3") {
+                const res = await mediChain.methods.insurerInfo(normalizedAccount).call().catch(() => null);
+                exists = res && res.exists;
+            }
+
+            if (!exists) {
+                setError("Registration transaction completed, but your account was not created. Your wallet might already be registered to a different role.");
+                setLoading(false);
+                return;
+            }
+
+            // Auto login after confirmed register
             setToken(role);
             localStorage.setItem('token', role);
             localStorage.setItem('account', account);
             navigate('/dashboard');
 
         } catch (err) {
-            console.error(err);
+            console.error("REGISTER ERROR STACK:", err);
             setError("Registration failed. Ensure you are connected and transaction is approved.");
         } finally {
             setLoading(false);
@@ -76,6 +103,7 @@ const Register = ({ mediChain, setToken, setAccount, connectWallet, account }) =
                                         >
                                             <option value="1">Patient</option>
                                             <option value="2">Doctor</option>
+                                            <option value="3">Insurer</option>
                                         </Form.Select>
                                     </Form.Group>
 

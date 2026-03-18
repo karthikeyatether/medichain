@@ -26,6 +26,21 @@ function App() {
   const [account, setAccount] = useState('');
   const [token, setToken] = useState('');
   const [mediChain, setMediChain] = useState(null);
+  const [isDarkMode, setIsDarkMode] = useState(
+    localStorage.getItem('theme') === 'dark' || false
+  );
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.body.classList.add('dark-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.body.classList.remove('dark-theme');
+      localStorage.setItem('theme', 'light');
+    }
+  }, [isDarkMode]);
+
+  const toggleTheme = () => setIsDarkMode(!isDarkMode);
 
   const connectWallet = async () => {
     if (window.ethereum) {
@@ -43,7 +58,7 @@ function App() {
   }
 
   const getContractInstance = async () => {
-    const web3 = new Web3(window.ethereum || Web3.givenProvider || 'http://localhost:8545')
+    const web3 = new Web3(window.ethereum || Web3.givenProvider || 'http://localhost:7545')
     const networkId = await web3.eth.net.getId()
     const networkData = MediChain.networks[networkId]
     if (networkData) {
@@ -66,8 +81,8 @@ function App() {
               params: [
                 {
                   chainId: '0x539',
-                  chainName: 'Localhost 8545',
-                  rpcUrls: ['http://localhost:8545'],
+                  chainName: 'Localhost 7545',
+                  rpcUrls: ['http://localhost:7545'],
                 },
               ],
             });
@@ -76,20 +91,34 @@ function App() {
             console.error(addError);
           }
         }
-        alert(`Smart contract not deployed to network ${networkId}. Please connect to Localhost 8545 (Chain ID 1337) or 5777.`);
+        alert(`Smart contract not deployed to network ${networkId}. Please connect to Localhost 7545 (Chain ID 1337) or 5777.`);
+      }
+    }
+  }
+
+  const eagerlyConnectWallet = async () => {
+    if (window.ethereum) {
+      try {
+        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+        if (accounts.length > 0) {
+          setAccount(accounts[0]);
+        }
+      } catch (error) {
+        console.error("Eager connection failed", error);
       }
     }
   }
 
   useEffect(() => {
     getContractInstance()
+    eagerlyConnectWallet()
   }, [])
 
   return (
     <ToastProvider>
-      <div className="App">
+      <div className={`App ${isDarkMode ? 'dark-theme' : ''}`}>
         <Router>
-          <SiteNavbar account={account} token={token} setToken={setToken} setAccount={setAccount} />
+          <SiteNavbar account={account} token={token} setToken={setToken} setAccount={setAccount} isDarkMode={isDarkMode} toggleTheme={toggleTheme} />
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/register" element={<Register mediChain={mediChain} account={account} token={token} setToken={setToken} setAccount={setAccount} connectWallet={connectWallet} ipfs={ipfs} />} />

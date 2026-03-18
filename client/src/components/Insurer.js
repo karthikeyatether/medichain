@@ -5,6 +5,7 @@ import Web3 from 'web3';
 import { Link } from 'react-router-dom'
 import SimpleBarChart from './SimpleBarChart';
 import Timeline from './Timeline';
+import Wallet from './Wallet';
 
 const Insurer = ({ mediChain, account, ethValue }) => {
     const [insurer, setInsurer] = useState(null);
@@ -34,20 +35,39 @@ const Insurer = ({ mediChain, account, ethValue }) => {
             return window.location.href = '/login'
         })
     }
-    const handleCloseRecordModal = () => setShowRecordModal(false);
     const handleShowRecordModal = async (e, patient) => {
-        var record = {}
-        await fetch(`${process.env.REACT_APP_INFURA_DEDICATED_GATEWAY}/ipfs/${patient.record}`)
-            .then(res => res.json())
-            .then(data => record = data)
-        await setPatientRecord(record);
-        await setShowRecordModal(true);
+        let combinedTreatments = [];
+        if (patient.records && patient.records.length > 0) {
+            await Promise.all(patient.records.map(async (hash) => {
+                if (!hash) return;
+                try {
+                    const res = await fetch(`${process.env.REACT_APP_INFURA_DEDICATED_GATEWAY}/ipfs/${hash}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data && data.treatments) {
+                            combinedTreatments = [...combinedTreatments, ...data.treatments];
+                        }
+                    }
+                } catch (err) {
+                    console.error("Error fetching record:", err);
+                }
+            }));
+        }
+        setPatientRecord({
+            name: patient.name,
+            age: patient.age,
+            address: patient.account,
+            treatments: combinedTreatments.reverse()
+        });
+        setShowRecordModal(true);
     }
     const getPatientList = async () => {
         var pat = await mediChain.methods.getInsurerPatientList(account).call();
         let pt = [];
         for (let i = 0; i < pat.length; i++) {
             let patient = await mediChain.methods.patientInfo(pat[i]).call();
+            let records = await mediChain.methods.getPatientRecords(pat[i]).call();
+            patient = { ...patient, account: pat[i], records: records }
             pt = [...pt, patient]
         }
         setPatList(pt)
@@ -65,7 +85,7 @@ const Insurer = ({ mediChain, account, ethValue }) => {
         setClaimsList(cl);
     }
     const approveClaim = async (e, claim) => {
-        let value = claim.valueClaimed / ethValue;
+        let value = (claim.valueClaimed / ethValue).toFixed(18); // Prevent JS floating point overflow in Web3
         mediChain.methods.approveClaimsByInsurer(claim.id).send({ from: account, value: Web3.utils.toWei(value.toString(), 'Ether') }).on('transactionHash', (hash) => {
             return window.location.href = '/login'
         })
@@ -77,12 +97,18 @@ const Insurer = ({ mediChain, account, ethValue }) => {
     }
 
     useEffect(() => {
-        if (account === "") return window.location.href = '/login'
-        if (!insurer) getInsurerData()
-        if (policyList.length === 0) getPolicyList();
-        if (patList.length === 0) getPatientList();
-        if (claimsIdList.length === 0) getClaimsData();
-    }, [insurer, patList, policyList, claimsIdList])
+        if (account === "") {
+            window.location.href = '/login';
+            return;
+        }
+        if (!mediChain) return;
+
+        getInsurerData();
+        getPolicyList();
+        getPatientList();
+        getClaimsData();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [account, mediChain])
 
 
     if (!insurer) return <div className="text-center mt-5"><div className="spinner-border text-primary" role="status"></div></div>;
@@ -93,6 +119,8 @@ const Insurer = ({ mediChain, account, ethValue }) => {
                 <h2 className="fw-bold text-primary">Insurer Dashboard</h2>
                 <span className="text-muted small">Logged in as: {insurer.email}</span>
             </div>
+
+            <Wallet mediChain={mediChain} account={account} ethValue={ethValue} />
 
             <Row className="mb-4">
                 <Col md={4} className="mb-4 mb-md-0">
@@ -280,7 +308,7 @@ const Insurer = ({ mediChain, account, ethValue }) => {
             </div>
 
             {patientRecord && (
-                <Modal size="xl" centered show={showRecordModal} onHide={handleCloseRecordModal} contentClassName="glass-card border-0">
+                <Modal size="xl" centered show={showRecordModal} onHide={() => setShowRecordModal(false)} contentClassName="glass-card border-0">
                     <Modal.Header closeButton className="border-0">
                         <Modal.Title className="text-primary fw-bold">Records for: {patientRecord.name}</Modal.Title>
                     </Modal.Header>

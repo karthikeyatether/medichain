@@ -4,6 +4,8 @@ import { Form, Button, Table, Modal, Row, Col, Badge, Container } from 'react-bo
 import { Link } from 'react-router-dom';
 import Timeline from './Timeline';
 import Web3 from 'web3';
+import Wallet from './Wallet';
+import { QRCodeCanvas } from 'qrcode.react';
 
 const Patient = ({ mediChain, account, ethValue }) => {
   const [patient, setPatient] = useState(null);
@@ -18,9 +20,16 @@ const Patient = ({ mediChain, account, ethValue }) => {
   const [showRecordModal, setShowRecordModal] = useState(false);
   const [patientRecord, setPatientRecord] = useState(null);
 
+  const handleDataError = (err) => {
+    console.error("Dashboard failed to load data:", err);
+    localStorage.removeItem("token");
+    window.location.href = '/login';
+  }
+
   const getPatientData = async () => {
     var patient = await mediChain.methods.patientInfo(account).call();
-    setPatient(patient);
+    var records = await mediChain.methods.getPatientRecords(account).call();
+    setPatient({ ...patient, records });
   }
   const giveAccess = (e) => {
     e.preventDefault();
@@ -58,8 +67,10 @@ const Patient = ({ mediChain, account, ethValue }) => {
     setInsurerList(it)
   }
   const getPolicyList = async () => {
-    var policyList = await mediChain.methods.getInsurerPolicyList(buyFromInsurer).call()
-    setPolicyList(policyList);
+    try {
+      var policyList = await mediChain.methods.getInsurerPolicyList(buyFromInsurer).call()
+      setPolicyList(policyList);
+    } catch (err) { handleDataError(err) }
   }
   const purchasePolicy = async (e) => {
     e.preventDefault();
@@ -69,15 +80,17 @@ const Patient = ({ mediChain, account, ethValue }) => {
     })
   }
   const getTransactionsList = async () => {
-    var transactionsIdList = await mediChain.methods.getPatientTransactions(account).call();
-    let tr = [];
-    for (let i = transactionsIdList.length - 1; i >= 0; i--) {
-      let transaction = await mediChain.methods.transactions(transactionsIdList[i]).call();
-      let doctor = await mediChain.methods.doctorInfo(transaction.receiver).call();
-      transaction = { ...transaction, id: transactionsIdList[i], doctorEmail: doctor.email }
-      tr = [...tr, transaction];
-    }
-    setTransactionsList(tr);
+    try {
+      var transactionsIdList = await mediChain.methods.getPatientTransactions(account).call();
+      let tr = [];
+      for (let i = transactionsIdList.length - 1; i >= 0; i--) {
+        let transaction = await mediChain.methods.transactions(transactionsIdList[i]).call();
+        let doctor = await mediChain.methods.doctorInfo(transaction.receiver).call();
+        transaction = { ...transaction, id: transactionsIdList[i], doctorEmail: doctor.email }
+        tr = [...tr, transaction];
+      }
+      setTransactionsList(tr);
+    } catch (err) { handleDataError(err) }
   }
   const settlePayment = async (e, transaction) => {
     let value = transaction.value / ethValue;
@@ -88,29 +101,75 @@ const Patient = ({ mediChain, account, ethValue }) => {
 
   const handleCloseRecordModal = () => setShowRecordModal(false);
   const handleShowRecordModal = async () => {
-    var record = {}
-    await fetch(`${process.env.REACT_APP_INFURA_DEDICATED_GATEWAY}/ipfs/${patient.record}`)
-      .then(res => res.json())
-      .then(data => record = data)
-    await setPatientRecord(record);
-    await setShowRecordModal(true);
+    let combinedTreatments = [];
+    if (patient.records && patient.records.length > 0) {
+      await Promise.all(patient.records.map(async (hash) => {
+        if (!hash) return;
+        try {
+          if (hash.startsWith("QmMockHash")) {
+            const existingRecords = JSON.parse(localStorage.getItem('mock_ipfs_records') || '{}');
+            if (existingRecords[hash] && existingRecords[hash].treatments) {
+              combinedTreatments = [...combinedTreatments, ...existingRecords[hash].treatments];
+            }
+          } else {
+            const res = await fetch(`${process.env.REACT_APP_INFURA_DEDICATED_GATEWAY}/ipfs/${hash}`);
+            if (res.ok) {
+              const data = await res.json();
+              if (data && data.treatments) {
+                combinedTreatments = [...combinedTreatments, ...data.treatments];
+              }
+            }
+          }
+        } catch (e) {
+          console.error("Error fetching record:", e);
+        }
+      }));
+    }
+    setPatientRecord({
+      name: patient.name,
+      age: patient.age,
+      address: account,
+      treatments: combinedTreatments.reverse()
+    });
+    setShowRecordModal(true);
   }
 
   useEffect(() => {
-    if (account === "") return window.location.href = '/login'
-    if (!patient) getPatientData()
-    if (docList.length === 0) getDoctorAccessList();
-    if (patient?.policyActive) getInsurer();
-    if (insurerList.length === 0) getInsurerList();
-    if (buyFromInsurer) getPolicyList();
-    if (transactionsList.length === 0) getTransactionsList();
-  }, [patient, docList, insurerList, buyFromInsurer, transactionsList])
+    if (account === "") {
+      window.location.href = '/login';
+      return;
+    }
+    if (!mediChain) return;
+
+    getPatientData();
+    getDoctorAccessList();
+    getInsurerList();
+    getTransactionsList();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [account, mediChain]);
+
+  useEffect(() => {
+    if (!mediChain) return;
+    if (patient && patient.policyActive) {
+      getInsurer();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [patient?.policyActive, mediChain]);
+
+  useEffect(() => {
+    if (!mediChain) return;
+    if (buyFromInsurer) {
+      getPolicyList();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [buyFromInsurer, mediChain]);
 
   if (!patient) return <div className="text-center mt-5"><div className="spinner-border text-primary" role="status"></div></div>;
 
   return (
     <div className="fade-in">
       <h2 className="mb-4 fw-bold text-primary">Patient Dashboard</h2>
+      <Wallet mediChain={mediChain} account={account} ethValue={ethValue} />
       <Row className="mb-4">
         <Col md={6} lg={4}>
           <div className="glass-card h-100">
@@ -119,6 +178,10 @@ const Patient = ({ mediChain, account, ethValue }) => {
             <div className="mb-2"><strong className="text-muted">Email:</strong> {patient.email}</div>
             <div className="mb-2"><strong className="text-muted">Age:</strong> {patient.age}</div>
             <div className="mb-4 text-truncate"><strong className="text-muted">Account:</strong> {account}</div>
+            <div className="text-center mb-4 p-3 bg-white rounded-3 shadow-sm d-inline-block border">
+              <QRCodeCanvas value={account} size={120} level={"H"} />
+              <div className="mt-2 small text-muted font-weight-bold">Digital ID (Web3)</div>
+            </div>
             <Button variant="primary" className="w-100 rounded-pill btn-primary" onClick={handleShowRecordModal}>
               View Medical Records 📂
             </Button>
@@ -191,15 +254,26 @@ const Patient = ({ mediChain, account, ethValue }) => {
                     <span className="text-muted">Cover Value:</span>
                     <span className="text-success fw-bold">INR {patient.policy.coverValue}</span>
                   </div>
-                  <div className="d-flex justify-content-between">
+                  <div className="d-flex justify-content-between mb-2">
                     <span className="text-muted">Premium:</span>
                     <span>
                       INR {patient.policy.premium}/year<br />
                       <small className="text-muted">~ {(patient.policy.premium / ethValue).toFixed(5)} ETH</small>
                     </span>
                   </div>
+                  <div className="d-flex justify-content-between pt-2 border-top mt-2">
+                    <span className="text-muted">Expiry:</span>
+                    <span className={`fw-bold ${Number(patient.policyExpiry) * 1000 < Date.now() ? 'text-danger' : 'text-primary'}`}>
+                      {new Date(Number(patient.policyExpiry) * 1000).toLocaleDateString()}
+                    </span>
+                  </div>
                 </div>
                 <div className="text-end text-muted small">
+                  {Number(patient.policyExpiry) * 1000 < Date.now() ?
+                    <Badge bg="danger" pill className="mb-1">Expired</Badge> :
+                    <Badge bg="success" pill className="mb-1">Active</Badge>
+                  }
+                  <br />
                   Duration: {patient.policy.timePeriod} Year{patient.policy.timePeriod > 1 ? 's' : ''}
                 </div>
               </>
@@ -210,8 +284,11 @@ const Patient = ({ mediChain, account, ethValue }) => {
                   <Form.Group className='mb-3'>
                     <Form.Label className="form-label">Select Provider</Form.Label>
                     <Form.Select className="form-control" onChange={(e) => {
-                      setBuyFromInsurer(e.target.value)
-                      getPolicyList()
+                      if (e.target.value !== "Choose Provider") {
+                        setBuyFromInsurer(e.target.value)
+                      } else {
+                        setBuyFromInsurer(null)
+                      }
                     }}>
                       <option>Choose Provider</option>
                       {insurerList.map((ins, idx) => <option key={idx} value={ins.account}>{ins.name}</option>)}

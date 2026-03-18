@@ -38,9 +38,90 @@
   --radius-xl: 1.5rem;
 }
 
+/* Dark Theme Overrides */
+.dark-theme {
+  --primary-color: #E2E8F0;
+  /* Slate 200 */
+  --secondary-color: #60A5FA;
+  /* Blue 400 */
+  --accent-color: #22D3EE;
+  /* Cyan 400 */
+  --background-color: #0F172A;
+  /* Slate 900 */
+  --surface-color: #1E293B;
+  /* Slate 800 */
+  --text-primary: #F8FAFC;
+  /* Slate 50 */
+  --text-secondary: #94A3B8;
+  /* Slate 400 */
+
+  --primary-gradient: linear-gradient(135deg, #1E293B 0%, #0F172A 100%);
+  --glass-gradient: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.4) 100%);
+  --shadow-glass: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+}
+
+body.dark-theme {
+  background-color: var(--background-color) !important;
+  color: var(--text-primary) !important;
+}
+
+.dark-theme .site-navbar {
+  background: rgba(30, 41, 59, 0.9) !important;
+}
+
+.dark-theme .hero-section,
+.dark-theme .auth-wrapper {
+  background: var(--background-color) !important;
+  background-image: none !important;
+}
+
+.dark-theme .bg-white {
+  background-color: var(--surface-color) !important;
+  color: var(--text-primary) !important;
+}
+
+.dark-theme .bg-light {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  color: var(--text-primary) !important;
+}
+
+.dark-theme .blob {
+  opacity: 0.15;
+}
+
+.dark-theme .navbar-brand span {
+  color: var(--text-primary) !important;
+}
+
+.dark-theme .nav-link {
+  color: var(--text-primary) !important;
+}
+
+.dark-theme .text-muted,
+.dark-theme .text-secondary {
+  color: var(--text-secondary) !important;
+}
+
+.dark-theme .text-dark,
+.dark-theme strong,
+.dark-theme h1,
+.dark-theme h2,
+.dark-theme h3,
+.dark-theme h4,
+.dark-theme h5,
+.dark-theme h6 {
+  color: var(--text-primary) !important;
+}
+
+
 html {
   font-size: 16px;
   scroll-behavior: smooth;
+}
+
+body {
+  transition: background-color 0.3s ease, color 0.3s ease;
+  /* Smooth toggle */
 }
 
 body {
@@ -126,14 +207,14 @@ ul {
 
 /* Cards (Glassmorphism) */
 .glass-card {
-  background: rgba(255, 255, 255, 0.7);
+  background: var(--surface-color) !important;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-glass);
   padding: 1.5rem;
-  /* Reduced from 2rem */
+  transition: background-color 0.3s ease;
 }
 
 /* ... existing styles ... */
