@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import 'bootstrap/dist/css/bootstrap.css';
-import { Form, Button, Modal, Table, Dropdown, DropdownButton, Row, Col, Badge } from 'react-bootstrap';
+import { Form, Button, Modal, Table, Row, Col, Badge } from 'react-bootstrap';
 import Web3 from 'web3';
 import { Link } from 'react-router-dom'
 import SimpleBarChart from './SimpleBarChart';
 import Timeline from './Timeline';
 import Wallet from './Wallet';
+import { useToast } from './ToastContext';
 
 const Insurer = ({ mediChain, account, ethValue }) => {
+    const addToast = useToast();
     const [insurer, setInsurer] = useState(null);
     const [patList, setPatList] = useState([]);
     const [policyList, setPolicyList] = useState([]);
@@ -18,8 +20,13 @@ const Insurer = ({ mediChain, account, ethValue }) => {
     const [showRecord, setShowRecord] = useState(false);
     const [claimsIdList, setClaimsIdList] = useState([]);
     const [claimsList, setClaimsList] = useState([]);
+    const [transactionsList, setTransactionsList] = useState([]);
     const [showRecordModal, setShowRecordModal] = useState(false);
     const [patientRecord, setPatientRecord] = useState(null);
+    // Claim action states
+    const [claimActionLoading, setClaimActionLoading] = useState({});
+    const [showClaimConfirm, setShowClaimConfirm] = useState(false);
+    const [pendingClaimAction, setPendingClaimAction] = useState(null); // { claim, type: 'approve'|'reject' }
 
     const getInsurerData = async () => {
         var insurer = await mediChain.methods.insurerInfo(account).call();
@@ -84,16 +91,49 @@ const Insurer = ({ mediChain, account, ethValue }) => {
         }
         setClaimsList(cl);
     }
+    const getTransactionsList = async () => {
+        try {
+            var transactionsIdList = await mediChain.methods.getInsurerTransactions(account).call();
+            let tr = [];
+            for (let i = transactionsIdList.length - 1; i >= 0; i--) {
+                let transaction = await mediChain.methods.transactions(transactionsIdList[i]).call();
+                let doctor = await mediChain.methods.doctorInfo(transaction.receiver).call();
+                transaction = { ...transaction, id: transactionsIdList[i], receiverEmail: doctor.email };
+                tr = [...tr, transaction];
+            }
+            setTransactionsList(tr);
+        } catch (err) {
+            console.error("Failed to load insurer transactions:", err);
+        }
+    }
     const approveClaim = async (e, claim) => {
-        let value = (claim.valueClaimed / ethValue).toFixed(18); // Prevent JS floating point overflow in Web3
-        mediChain.methods.approveClaimsByInsurer(claim.id).send({ from: account, value: Web3.utils.toWei(value.toString(), 'Ether') }).on('transactionHash', (hash) => {
-            return window.location.href = '/login'
-        })
+        setPendingClaimAction({ claim, type: 'approve' });
+        setShowClaimConfirm(true);
     }
     const rejectClaim = async (e, claim) => {
-        mediChain.methods.rejectClaimsByInsurer(claim.id).send({ from: account }).on('transactionHash', (hash) => {
-            return window.location.href = '/login'
-        })
+        setPendingClaimAction({ claim, type: 'reject' });
+        setShowClaimConfirm(true);
+    }
+    const executeClaimAction = async () => {
+        const { claim, type } = pendingClaimAction;
+        setShowClaimConfirm(false);
+        setClaimActionLoading(prev => ({ ...prev, [claim.id]: type }));
+        try {
+            if (type === 'approve') {
+                let value = (claim.valueClaimed / ethValue).toFixed(18);
+                await mediChain.methods.approveClaimsByInsurer(claim.id).send({ from: account, value: Web3.utils.toWei(value.toString(), 'Ether') });
+                addToast(`Claim #${claim.id} approved. Funds transferred to doctor.`, 'success');
+            } else {
+                await mediChain.methods.rejectClaimsByInsurer(claim.id).send({ from: account });
+                addToast(`Claim #${claim.id} rejected. Cover restored to patient.`, 'warning');
+            }
+            setTimeout(() => window.location.reload(), 1800);
+        } catch (err) {
+            console.error('Claim action error:', err);
+            addToast(`Failed to ${type} claim. Check console.`, 'danger');
+        } finally {
+            setClaimActionLoading(prev => { const n = { ...prev }; delete n[claim.id]; return n; });
+        }
     }
 
     useEffect(() => {
@@ -107,6 +147,7 @@ const Insurer = ({ mediChain, account, ethValue }) => {
         getPolicyList();
         getPatientList();
         getClaimsData();
+        getTransactionsList();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [account, mediChain])
 
@@ -212,7 +253,13 @@ const Insurer = ({ mediChain, account, ethValue }) => {
             <Row className="mb-4">
                 <Col md={12}>
                     <div className="glass-card">
-                        <h4 className="mb-3 text-secondary">Claims Management</h4>
+                        <h4 className="mb-3 text-secondary">Claims Management
+                            {claimsList.filter(c => !c.approved && !c.rejected).length > 0 &&
+                                <Badge bg="danger" pill className="ms-2 fs-6">
+                                    {claimsList.filter(c => !c.approved && !c.rejected).length} Pending
+                                </Badge>
+                            }
+                        </h4>
                         <div className="table-responsive">
                             <Table className="custom-table align-middle">
                                 <thead>
@@ -241,11 +288,19 @@ const Insurer = ({ mediChain, account, ethValue }) => {
                                                 <td>
                                                     {!claim.approved && !claim.rejected ?
                                                         <div className="d-flex gap-2">
-                                                            <Button onClick={(e) => approveClaim(e, claim)} variant="success" size="sm" className="rounded-pill px-3">
-                                                                Approve
+                                                            <Button
+                                                                onClick={(e) => approveClaim(e, claim)}
+                                                                variant="success" size="sm" className="rounded-pill px-3"
+                                                                disabled={!!claimActionLoading[claim.id]}
+                                                            >
+                                                                {claimActionLoading[claim.id] === 'approve' ? '⏳' : 'Approve'}
                                                             </Button>
-                                                            <Button onClick={(e) => rejectClaim(e, claim)} variant="danger" size="sm" className="rounded-pill px-3">
-                                                                Reject
+                                                            <Button
+                                                                onClick={(e) => rejectClaim(e, claim)}
+                                                                variant="danger" size="sm" className="rounded-pill px-3"
+                                                                disabled={!!claimActionLoading[claim.id]}
+                                                            >
+                                                                {claimActionLoading[claim.id] === 'reject' ? '⏳' : 'Reject'}
                                                             </Button>
                                                         </div>
                                                         : <span className="text-muted small">Processed</span>
@@ -254,6 +309,54 @@ const Insurer = ({ mediChain, account, ethValue }) => {
                                             </tr>
                                         ))
                                         : <tr><td colSpan="6" className="text-center text-muted">No claims pending</td></tr>
+                                    }
+                                </tbody>
+                            </Table>
+                        </div>
+                    </div>
+                </Col>
+            </Row>
+
+            <Row className="mb-4">
+                <Col md={12}>
+                    <div className="glass-card">
+                        <h4 className="mb-3 text-secondary">Transaction History</h4>
+                        <div className="table-responsive">
+                            <Table className="custom-table align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>Doctor (Receiver)</th>
+                                        <th>Amount</th>
+                                        <th>Date</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {transactionsList.length > 0 ?
+                                        transactionsList.map((transaction, idx) => (
+                                            <tr key={idx}>
+                                                <td><small>{transaction.receiverEmail}</small></td>
+                                                <td>
+                                                    <strong>{transaction.value} INR</strong><br />
+                                                    <small className="text-muted">~ {(transaction.value / ethValue).toFixed(5)} ETH</small>
+                                                </td>
+                                                <td>
+                                                    <small className="text-muted">
+                                                        {transaction.timestamp && Number(transaction.timestamp) > 0
+                                                            ? new Date(Number(transaction.timestamp) * 1000).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+                                                            : "—"
+                                                        }
+                                                    </small>
+                                                </td>
+                                                <td>
+                                                    {transaction.settled ?
+                                                        <Badge bg="success" pill>Settled</Badge> :
+                                                        <Badge bg="warning" text="dark" pill>Pending</Badge>
+                                                    }
+                                                </td>
+                                            </tr>
+                                        ))
+                                        : <tr><td colSpan="4" className="text-center text-muted">No transactions found</td></tr>
                                     }
                                 </tbody>
                             </Table>
@@ -314,7 +417,7 @@ const Insurer = ({ mediChain, account, ethValue }) => {
                     </Modal.Header>
                     <Modal.Body>
                         <div className="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
-                            <h5 className="text-secondary mb-0">Diagnosis & Treatment History</h5>
+                            <h5 className="text-secondary mb-0">Diagnosis &amp; Treatment History</h5>
                             <Button variant="outline-dark" size="sm" className="rounded-pill" onClick={() => window.print()}>
                                 Print Report 🖨️
                             </Button>
@@ -323,6 +426,40 @@ const Insurer = ({ mediChain, account, ethValue }) => {
                     </Modal.Body>
                 </Modal>
             )}
+
+            {/* Claim Confirm Modal */}
+            <Modal show={showClaimConfirm} onHide={() => setShowClaimConfirm(false)} centered contentClassName="glass-card border-0">
+                <Modal.Header closeButton className="border-0">
+                    <Modal.Title className={`fw-bold ${pendingClaimAction?.type === 'approve' ? 'text-success' : 'text-danger'}`}>
+                        {pendingClaimAction?.type === 'approve' ? '✅ Approve Claim' : '❌ Reject Claim'}
+                    </Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    {pendingClaimAction && (
+                        <>
+                            <p>{pendingClaimAction.type === 'approve'
+                                ? 'Approving this claim will transfer funds to the doctor. This cannot be undone.'
+                                : 'Rejecting this claim will restore the cover value to the patient. The claim moves to out-of-pocket.'
+                            }</p>
+                            <div className="bg-light rounded p-3">
+                                <div className="d-flex justify-content-between"><span className="text-muted">Patient:</span><strong>{pendingClaimAction.claim.patientEmail}</strong></div>
+                                <div className="d-flex justify-content-between"><span className="text-muted">Doctor:</span><strong>{pendingClaimAction.claim.doctorEmail}</strong></div>
+                                <div className="d-flex justify-content-between"><span className="text-muted">Claim Value:</span><strong>INR {pendingClaimAction.claim.valueClaimed}</strong></div>
+                            </div>
+                        </>
+                    )}
+                </Modal.Body>
+                <Modal.Footer className="border-0">
+                    <Button variant="secondary" className="rounded-pill" onClick={() => setShowClaimConfirm(false)}>Cancel</Button>
+                    <Button
+                        variant={pendingClaimAction?.type === 'approve' ? 'success' : 'danger'}
+                        className="rounded-pill"
+                        onClick={executeClaimAction}
+                    >
+                        Confirm {pendingClaimAction?.type === 'approve' ? 'Approval' : 'Rejection'}
+                    </Button>
+                </Modal.Footer>
+            </Modal>
         </div>
     )
 }

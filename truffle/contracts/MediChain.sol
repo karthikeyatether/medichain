@@ -92,6 +92,7 @@ contract MediChain is ReentrancyGuard {
         address receiver;
         uint value;
         bool settled;
+        uint timestamp;
     }
 
     
@@ -204,6 +205,11 @@ contract MediChain is ReentrancyGuard {
         require(doctorInfo[_addr].exists);
         return (doctorInfo[_addr].transactions);
     }
+    function getInsurerTransactions(address _addr) view public returns (uint[] memory){
+        require(_addr != address(0));
+        require(insurerInfo[_addr].exists);
+        return (insurerInfo[_addr].transactions);
+    }
     function getAllDoctorsAddress() view public returns (address[] memory) {
         return doctorList;
     }
@@ -250,7 +256,7 @@ contract MediChain is ReentrancyGuard {
         patientInfo[msg.sender].policy.timePeriod = policyList[_id].timePeriod;
         patientInfo[msg.sender].policy.premium = policyList[_id].premium;
         patientInfo[msg.sender].policyActive = true;
-        patientInfo[msg.sender].policyExpiry = block.timestamp + (policyList[_id].timePeriod * 1 days);
+        patientInfo[msg.sender].policyExpiry = block.timestamp + (policyList[_id].timePeriod * 365 days);
         
         insurerInfo[policyList[_id].insurer].patients.push(msg.sender);
         emit PolicyBought(msg.sender, _id);
@@ -301,7 +307,7 @@ contract MediChain is ReentrancyGuard {
             address iaddr = patientInfo[paddr].policy.insurer;
             if(patientInfo[paddr].policy.coverValue >= charges){
                 transactionCount++;
-                transactions[transactionCount] = Transactions(iaddr, msg.sender, charges, false);
+                transactions[transactionCount] = Transactions(iaddr, msg.sender, charges, false, block.timestamp);
                 doctorInfo[msg.sender].transactions.push(transactionCount);
                 insurerInfo[iaddr].transactions.push(transactionCount);
                 patientInfo[paddr].policy.coverValue = patientInfo[paddr].policy.coverValue - charges;
@@ -314,11 +320,11 @@ contract MediChain is ReentrancyGuard {
                 emit ClaimRequested(claimsCount, msg.sender, paddr);
             }else{
                 transactionCount++;
-                transactions[transactionCount] = Transactions(paddr, msg.sender, charges-patientInfo[paddr].policy.coverValue, false);
+                transactions[transactionCount] = Transactions(paddr, msg.sender, charges-patientInfo[paddr].policy.coverValue, false, block.timestamp);
                 doctorInfo[msg.sender].transactions.push(transactionCount);
                 patientInfo[paddr].transactions.push(transactionCount);
                 transactionCount++;
-                transactions[transactionCount] = Transactions(iaddr, msg.sender, patientInfo[paddr].policy.coverValue, false);
+                transactions[transactionCount] = Transactions(iaddr, msg.sender, patientInfo[paddr].policy.coverValue, false, block.timestamp);
                 doctorInfo[msg.sender].transactions.push(transactionCount);
                 insurerInfo[iaddr].transactions.push(transactionCount);
                 claimsCount++;
@@ -330,7 +336,7 @@ contract MediChain is ReentrancyGuard {
             }
         }else{
             transactionCount++;
-            transactions[transactionCount] = Transactions(paddr, msg.sender, charges, false);
+            transactions[transactionCount] = Transactions(paddr, msg.sender, charges, false, block.timestamp);
             doctorInfo[msg.sender].transactions.push(transactionCount);
             patientInfo[paddr].transactions.push(transactionCount);
         }
@@ -397,6 +403,31 @@ contract MediChain is ReentrancyGuard {
         pendingWithdrawals[msg.sender] = 0;
         payable(msg.sender).transfer(amount);
         emit FundsWithdrawn(msg.sender, amount);
+    }
+
+    // Called by Patient — renews an expired policy by buying same policy again
+    function renewPolicy(uint _id) payable public nonReentrant {
+        require(_id < policyList.length);
+        require(msg.sender != address(0));
+        require(patientInfo[msg.sender].exists);
+        // Must be the same insurer's policy OR policy must be expired
+        require(
+            !patientInfo[msg.sender].policyActive ||
+            block.timestamp > patientInfo[msg.sender].policyExpiry,
+            "Current policy is still active"
+        );
+
+        pendingWithdrawals[policyList[_id].insurer] += msg.value;
+
+        patientInfo[msg.sender].policy.id = policyList[_id].id;
+        patientInfo[msg.sender].policy.name = policyList[_id].name;
+        patientInfo[msg.sender].policy.coverValue = policyList[_id].coverValue;
+        patientInfo[msg.sender].policy.insurer = policyList[_id].insurer;
+        patientInfo[msg.sender].policy.timePeriod = policyList[_id].timePeriod;
+        patientInfo[msg.sender].policy.premium = policyList[_id].premium;
+        patientInfo[msg.sender].policyActive = true;
+        patientInfo[msg.sender].policyExpiry = block.timestamp + (policyList[_id].timePeriod * 365 days);
+        emit PolicyBought(msg.sender, _id);
     }
 
     // requestEmergencyAccess removed for security reasons

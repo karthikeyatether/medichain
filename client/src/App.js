@@ -116,7 +116,7 @@ function App() {
 
   return (
     <ToastProvider>
-      <div className={`App ${isDarkMode ? 'dark-theme' : ''}`}>
+      <div className={`app-wrapper ${isDarkMode ? 'dark-theme' : ''}`}>
         <Router>
           <SiteNavbar account={account} token={token} setToken={setToken} setAccount={setAccount} isDarkMode={isDarkMode} toggleTheme={toggleTheme} />
           <Routes>
