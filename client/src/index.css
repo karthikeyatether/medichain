@@ -325,6 +325,26 @@ ul { list-style: none; padding: 0; margin: 0; }
   box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
 }
 
+/* Form group spacing */
+.form-group { margin-bottom: 1rem; }
+
+/* Input placeholder color */
+.form-control::placeholder { color: var(--text-muted); }
+.dark-theme .form-control::placeholder { color: var(--gray-500); }
+
+/* Checkbox & radio accent */
+input[type="checkbox"], input[type="radio"] { accent-color: var(--brand-500); }
+
+/* Blob 3 */
+.blob-3 {
+  top: 40%; left: 30%;
+  width: 300px; height: 300px;
+  background: linear-gradient(135deg, rgba(139,92,246,0.35) 0%, rgba(99,102,241,0.25) 100%);
+  border-radius: 40% 60% 60% 40% / 40% 40% 60% 60%;
+  animation-delay: -2s;
+  opacity: 0.25;
+}
+
 .dark-theme .form-control,
 .dark-theme .form-select {
   background: var(--surface-2);

@@ -38,7 +38,7 @@ contract MediChain is ReentrancyGuard {
     event ClaimRejected(uint indexed claimId);
     event TransactionSettled(uint indexed transactionId, address indexed sender, address indexed receiver);
     event FundsWithdrawn(address indexed user, uint amount);
-    event EmergencyAccessGranted(address indexed patient, address indexed doctor, uint timestamp);
+
 
     struct Patient {
         string name;
