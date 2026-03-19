@@ -272,7 +272,8 @@ contract MediChain is ReentrancyGuard {
         require(_id < policyList.length,           "Invalid policy ID");
         require(!patientInfo[msg.sender].policyActive ||
                 block.timestamp > patientInfo[msg.sender].policyExpiry,
-                "Active policy exists — use renewPolicy");
+                "Active policy exists - use renewPolicy");
+
         require(msg.value > 0,                     "Must send ETH premium");
 
         _assignPolicy(msg.sender, _id);
