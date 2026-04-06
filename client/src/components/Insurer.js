@@ -127,7 +127,7 @@ const Insurer = ({ mediChain, account, ethValue }) => {
                 await mediChain.methods.rejectClaimsByInsurer(claim.id).send({ from: account });
                 addToast(`Claim #${claim.id} rejected. Cover restored to patient.`, 'warning');
             }
-            setTimeout(() => window.location.reload(), 1800);
+            setTimeout(() => { getInsurerData(); getPolicyList(); getPatientList(); getClaimsData(); getTransactionsList(); }, 1800);
         } catch (err) {
             console.error('Claim action error:', err);
             addToast(`Failed to ${type} claim. Check console.`, 'danger');

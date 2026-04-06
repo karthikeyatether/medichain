@@ -163,7 +163,11 @@ const Doctor = ({ ipfs, mediChain, account, ethValue }) => {
           addToast("Diagnosis submitted! Waiting for confirmation...", "info");
           setSubmitting(false);
           setShowModal(false);
-          setTimeout(() => window.location.reload(), 2500);
+          setTimeout(() => {
+            getDoctorData();
+            getPatientAccessList();
+            getTransactionsList();
+          }, 2500);
         })
         .on('error', (error) => {
           console.error("Blockchain Transaction Error:", error);
