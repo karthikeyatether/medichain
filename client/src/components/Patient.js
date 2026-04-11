@@ -4,7 +4,7 @@ import { Form, Button, Table, Modal, Row, Col, Badge, ProgressBar } from 'react-
 import { Link } from 'react-router-dom';
 import Timeline from './Timeline';
 import Web3 from 'web3';
-import Wallet from './Wallet';
+
 import { QRCodeCanvas } from 'qrcode.react';
 import { useToast } from './ToastContext';
 
@@ -193,7 +193,7 @@ const Patient = ({ mediChain, account, ethValue }) => {
       .on('transactionHash', () => {
         addToast("Payment settled successfully!", "success");
         setTxPending(false);
-        setTimeout(() => window.location.href = '/login', 1500);
+        setTimeout(() => getTransactionsList(), 1500);
       })
       .on('error', (err) => {
         addToast("Payment failed.", "danger");
@@ -285,15 +285,17 @@ const Patient = ({ mediChain, account, ethValue }) => {
   return (
     <div className="fade-in">
       <h2 className="mb-4 fw-bold text-primary">Patient Dashboard</h2>
-      <Wallet mediChain={mediChain} account={account} ethValue={ethValue} />
+
       <Row className="mb-4">
         <Col md={6} lg={4}>
           <div className="glass-card h-100">
             <h4 className="mb-3 text-secondary">My Profile</h4>
-            <div className="mb-2"><strong className="text-muted">Name:</strong> {patient.name}</div>
-            <div className="mb-2"><strong className="text-muted">Email:</strong> {patient.email}</div>
-            <div className="mb-2"><strong className="text-muted">Age:</strong> {patient.age}</div>
-            <div className="mb-4 text-truncate"><strong className="text-muted">Account:</strong> {account}</div>
+            <div className="d-flex flex-column gap-2 mb-4">
+              <div className="d-flex justify-content-between"><span className="text-muted">Name:</span> <strong style={{color: 'var(--text-primary)'}}>{patient.name}</strong></div>
+              <div className="d-flex justify-content-between"><span className="text-muted">Email:</span> <strong style={{color: 'var(--text-primary)'}}>{patient.email}</strong></div>
+              <div className="d-flex justify-content-between"><span className="text-muted">Age:</span> <strong style={{color: 'var(--text-primary)'}}>{patient.age}</strong></div>
+              <div className="d-flex justify-content-between"><span className="text-muted">Account:</span> <strong className="text-truncate" style={{maxWidth: '120px', color: 'var(--text-primary)'}}>{account}</strong></div>
+            </div>
             <div className="text-center mb-4 p-3 bg-white rounded-3 shadow-sm d-inline-block border">
               <QRCodeCanvas value={account} size={120} level={"H"} />
               <div className="mt-2 small text-muted font-weight-bold">Digital ID (Web3)</div>
@@ -357,14 +359,14 @@ const Patient = ({ mediChain, account, ethValue }) => {
             {patient.policyActive && insurer ? (
               <>
                 <h4 className="mb-3 text-secondary">Insurance Details</h4>
-                <div className="p-3 bg-light rounded-3 mb-3 border">
+                <div className="p-3 rounded-3 mb-3 border" style={{background: 'var(--surface)'}}>
                   <div className="d-flex justify-content-between mb-2">
                     <span className="text-muted">Provider:</span>
-                    <span className="fw-bold">{insurer.name}</span>
+                    <span className="fw-bold" style={{color: 'var(--text-primary)'}}>{insurer.name}</span>
                   </div>
                   <div className="d-flex justify-content-between mb-2">
                     <span className="text-muted">Policy:</span>
-                    <span className="fw-bold">{patient.policy.name}</span>
+                    <span className="fw-bold" style={{color: 'var(--text-primary)'}}>{patient.policy.name}</span>
                   </div>
                   <div className="d-flex justify-content-between mb-2">
                     <span className="text-muted">Cover Value:</span>
@@ -386,7 +388,7 @@ const Patient = ({ mediChain, account, ethValue }) => {
                   )}
                   <div className="d-flex justify-content-between mb-2">
                     <span className="text-muted">Premium:</span>
-                    <span>
+                    <span className="text-end" style={{color: 'var(--text-primary)'}}>
                       INR {patient.policy.premium}/year<br />
                       <small className="text-muted">~ {(patient.policy.premium / ethValue).toFixed(5)} ETH</small>
                     </span>

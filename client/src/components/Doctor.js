@@ -236,7 +236,7 @@ const Doctor = ({ ipfs, mediChain, account, ethValue }) => {
             </div>
             <div className="mt-3 pt-2 border-top">
               <small className="text-muted d-block mb-1">Wallet Address</small>
-              <div className="text-truncate bg-white p-2 rounded border small">{account}</div>
+              <div className="text-truncate p-2 rounded border small" style={{background: 'var(--surface)', color: 'var(--text-primary)'}}>{account}</div>
             </div>
             <div className="mt-3 p-2 bg-light rounded text-center d-flex align-items-center justify-content-between px-3">
               <span className="text-muted">Active Patients</span>
