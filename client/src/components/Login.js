@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Container, Row, Col, Form, Button, Alert } from 'react-bootstrap';
 import { useNavigate, Link } from 'react-router-dom';
+import { useWeb3 } from '../Web3Context';
 
 const roleOptions = [
   { value: '1', label: 'Patient', icon: '👤', desc: 'Access your health records & insurance' },
@@ -8,7 +9,8 @@ const roleOptions = [
   { value: '3', label: 'Insurer', icon: '🛡️', desc: 'Review policies & approve claims' },
 ];
 
-const Login = ({ mediChain, setToken, setAccount, connectWallet, account }) => {
+const Login = () => {
+  const { mediChain, setToken, setAccount, connectWallet, account } = useWeb3();
   const [role, setRole] = useState('1');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');

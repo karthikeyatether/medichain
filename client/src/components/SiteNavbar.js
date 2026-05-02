@@ -2,9 +2,11 @@ import Identicon from 'identicon.js';
 import { Container, Nav, Navbar, Button } from "react-bootstrap";
 import { Link, useNavigate } from 'react-router-dom';
 import logo from '../assets/logo.svg';
+import { useWeb3 } from '../Web3Context';
 
-const SiteNavbar = ({ token, account, setAccount, setToken, isDarkMode, toggleTheme }) => {
+const SiteNavbar = () => {
   const navigate = useNavigate();
+  const { token, account, setAccount, setToken, isDarkMode, toggleTheme } = useWeb3();
 
   const logout = () => {
     localStorage.removeItem('token');

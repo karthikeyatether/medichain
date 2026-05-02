@@ -2,13 +2,16 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 /**
  * @title MediChain
  * @notice Decentralized medical records, insurance, and payment management on Ethereum.
  * @dev Uses pull-over-push payment pattern (ReentrancyGuard) for secure withdrawals.
  */
-contract MediChain is ReentrancyGuard {
+contract MediChain is Initializable, ReentrancyGuard, UUPSUpgradeable, OwnableUpgradeable {
 
     // ─────────────────────────────────────────────
     // State Variables
@@ -136,13 +139,22 @@ contract MediChain is ReentrancyGuard {
     }
 
     // ─────────────────────────────────────────────
-    // Constructor
+    // Initialization (UUPS Proxy)
     // ─────────────────────────────────────────────
+    /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
+        _disableInitializers();
+    }
+
+    function initialize() public initializer {
+        __Ownable_init(msg.sender);
+
         name = "MediChain";
         claimsCount = 0;
         transactionCount = 0;
     }
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     // ─────────────────────────────────────────────
     // Registration

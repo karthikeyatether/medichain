@@ -5,8 +5,14 @@ import { Link } from 'react-router-dom';
 import { Buffer } from 'buffer';
 import { useToast } from './ToastContext';
 import Wallet from './Wallet';
+import { useWeb3 } from '../Web3Context';
+import { pinataUploadText, pinataUploadFile } from '../Web3Context';
+import CryptoJS from 'crypto-js';
 
-const Doctor = ({ ipfs, mediChain, account, ethValue }) => {
+const SECRET_KEY = process.env.REACT_APP_ENCRYPTION_SECRET || 'medichain-secure-key-2026';
+
+const Doctor = () => {
+  const { mediChain, account, ethValue } = useWeb3();
   const addToast = useToast();
   const [doctor, setDoctor] = useState(null);
   const [patient, setPatient] = useState(null);
@@ -15,6 +21,7 @@ const Doctor = ({ ipfs, mediChain, account, ethValue }) => {
   const [treatment, setTreatment] = useState('');
   const [charges, setCharges] = useState('');
   const [fileBuffer, setFileBuffer] = useState(null);
+  const [fileName, setFileName] = useState(null);
   const [patList, setPatList] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [showRecordModal, setShowRecordModal] = useState(false);
@@ -65,13 +72,15 @@ const Doctor = ({ ipfs, mediChain, account, ethValue }) => {
     } catch (err) { handleDataError(err) }
   }
   const captureFile = async (e) => {
-    e.preventDefault()
+    e.preventDefault();
     const file = e.target.files[0];
-    const reader = new window.FileReader()
-    reader.readAsArrayBuffer(file)
+    if (!file) return;
+    setFileName(file.name);
+    const reader = new window.FileReader();
+    reader.readAsArrayBuffer(file);
     reader.onloadend = () => {
-      setFileBuffer(Buffer(reader.result))
-    }
+      setFileBuffer(Buffer(reader.result));
+    };
   }
 
   const handleCloseModal = () => {
@@ -80,6 +89,7 @@ const Doctor = ({ ipfs, mediChain, account, ethValue }) => {
     setTreatment('');
     setCharges('');
     setFileBuffer(null);
+    setFileName(null);
   };
   const handleCloseRecordModal = () => setShowRecordModal(false);
   const handleShowModal = async (patient) => {
@@ -100,9 +110,22 @@ const Doctor = ({ ipfs, mediChain, account, ethValue }) => {
           } else {
             const res = await fetch(`${process.env.REACT_APP_INFURA_DEDICATED_GATEWAY}/ipfs/${hash}`);
             if (res.ok) {
-              const data = await res.json();
-              if (data && data.treatments) {
-                combinedTreatments = [...combinedTreatments, ...data.treatments];
+              const encryptedText = await res.text();
+              try {
+                // Try to decrypt the JSON payload
+                const bytes = CryptoJS.AES.decrypt(encryptedText, SECRET_KEY);
+                const decryptedData = JSON.parse(bytes.toString(CryptoJS.enc.Utf8));
+                if (decryptedData && decryptedData.treatments) {
+                  combinedTreatments = [...combinedTreatments, ...decryptedData.treatments];
+                }
+              } catch (e) {
+                // Fallback for old plaintext JSON records
+                try {
+                  const data = JSON.parse(encryptedText);
+                  if (data && data.treatments) {
+                    combinedTreatments = [...combinedTreatments, ...data.treatments];
+                  }
+                } catch (err) { }
               }
             }
           }
@@ -128,13 +151,14 @@ const Doctor = ({ ipfs, mediChain, account, ethValue }) => {
     setShowConfirmModal(false);
     setSubmitting(true);
     try {
-      let file = "";
-      if (fileBuffer) {
+      let prescriptionCid = '';
+      if (fileBuffer && fileName) {
         try {
-          const res = await ipfs.add(fileBuffer);
-          file = res.path;
+          prescriptionCid = await pinataUploadFile(fileBuffer, fileName);
+          addToast('Prescription uploaded to IPFS ✅', 'info');
         } catch (error) {
-          console.error("IPFS File Upload Error:", error);
+          console.error('IPFS Prescription Upload Error:', error);
+          addToast('Prescription upload failed, continuing without it.', 'warning');
         }
       }
 
@@ -148,17 +172,17 @@ const Doctor = ({ ipfs, mediChain, account, ethValue }) => {
       });
 
       var record = {
-        treatments: [{ disease, treatment, charges, prescription: file, date: formattedDate, doctorEmail: doctor.email }]
+        treatments: [{ disease, treatment, charges, prescription: prescriptionCid, date: formattedDate, doctorEmail: doctor.email }]
       };
 
-      const pseudoHash = "QmMockHash" + Date.now().toString(16);
-      const existingRecords = JSON.parse(localStorage.getItem('mock_ipfs_records') || '{}');
-      existingRecords[pseudoHash] = record;
-      localStorage.setItem('mock_ipfs_records', JSON.stringify(existingRecords));
+      // Encrypt the JSON payload for Privacy
+      const encryptedRecord = CryptoJS.AES.encrypt(JSON.stringify(record), SECRET_KEY).toString();
 
-      const result = { path: pseudoHash };
+      // Upload Encrypted JSON to Pinata/IPFS
+      const recordHash = await pinataUploadText(encryptedRecord);
+      addToast('Medical record pinned to IPFS ✅', 'info');
 
-      mediChain.methods.insuranceClaimRequest(patient.account, result.path, parseInt(charges)).send({ from: account })
+      mediChain.methods.insuranceClaimRequest(patient.account, recordHash, parseInt(charges)).send({ from: account })
         .on('transactionHash', (hash) => {
           addToast("Diagnosis submitted! Waiting for confirmation...", "info");
           setSubmitting(false);

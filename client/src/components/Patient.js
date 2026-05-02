@@ -7,8 +7,13 @@ import Web3 from 'web3';
 
 import { QRCodeCanvas } from 'qrcode.react';
 import { useToast } from './ToastContext';
+import { useWeb3 } from '../Web3Context';
+import CryptoJS from 'crypto-js';
 
-const Patient = ({ mediChain, account, ethValue }) => {
+const SECRET_KEY = process.env.REACT_APP_ENCRYPTION_SECRET || 'medichain-secure-key-2026';
+
+const Patient = () => {
+  const { mediChain, account, ethValue } = useWeb3();
   const addToast = useToast();
   const [patient, setPatient] = useState(null);
   const [docEmail, setDocEmail] = useState("");
@@ -216,9 +221,20 @@ const Patient = ({ mediChain, account, ethValue }) => {
           } else {
             const res = await fetch(`${process.env.REACT_APP_INFURA_DEDICATED_GATEWAY}/ipfs/${hash}`);
             if (res.ok) {
-              const data = await res.json();
-              if (data && data.treatments) {
-                combinedTreatments = [...combinedTreatments, ...data.treatments];
+              const encryptedText = await res.text();
+              try {
+                const bytes = CryptoJS.AES.decrypt(encryptedText, SECRET_KEY);
+                const decryptedData = JSON.parse(bytes.toString(CryptoJS.enc.Utf8));
+                if (decryptedData && decryptedData.treatments) {
+                  combinedTreatments = [...combinedTreatments, ...decryptedData.treatments];
+                }
+              } catch (e) {
+                try {
+                  const data = JSON.parse(encryptedText);
+                  if (data && data.treatments) {
+                    combinedTreatments = [...combinedTreatments, ...data.treatments];
+                  }
+                } catch (err) {}
               }
             }
           }

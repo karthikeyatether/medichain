@@ -7,8 +7,14 @@ import SimpleBarChart from './SimpleBarChart';
 import Timeline from './Timeline';
 import Wallet from './Wallet';
 import { useToast } from './ToastContext';
+import { useWeb3 } from '../Web3Context';
 
-const Insurer = ({ mediChain, account, ethValue }) => {
+import CryptoJS from 'crypto-js';
+
+const SECRET_KEY = process.env.REACT_APP_ENCRYPTION_SECRET || 'medichain-secure-key-2026';
+
+const Insurer = () => {
+    const { mediChain, account, ethValue } = useWeb3();
     const addToast = useToast();
     const [insurer, setInsurer] = useState(null);
     const [patList, setPatList] = useState([]);
@@ -48,11 +54,29 @@ const Insurer = ({ mediChain, account, ethValue }) => {
             await Promise.all(patient.records.map(async (hash) => {
                 if (!hash) return;
                 try {
-                    const res = await fetch(`${process.env.REACT_APP_INFURA_DEDICATED_GATEWAY}/ipfs/${hash}`);
-                    if (res.ok) {
-                        const data = await res.json();
-                        if (data && data.treatments) {
-                            combinedTreatments = [...combinedTreatments, ...data.treatments];
+                    if (hash.startsWith("QmMockHash")) {
+                        const existingRecords = JSON.parse(localStorage.getItem('mock_ipfs_records') || '{}');
+                        if (existingRecords[hash] && existingRecords[hash].treatments) {
+                            combinedTreatments = [...combinedTreatments, ...existingRecords[hash].treatments];
+                        }
+                    } else {
+                        const res = await fetch(`${process.env.REACT_APP_INFURA_DEDICATED_GATEWAY}/ipfs/${hash}`);
+                        if (res.ok) {
+                            const encryptedText = await res.text();
+                            try {
+                                const bytes = CryptoJS.AES.decrypt(encryptedText, SECRET_KEY);
+                                const decryptedData = JSON.parse(bytes.toString(CryptoJS.enc.Utf8));
+                                if (decryptedData && decryptedData.treatments) {
+                                    combinedTreatments = [...combinedTreatments, ...decryptedData.treatments];
+                                }
+                            } catch (e) {
+                                try {
+                                    const data = JSON.parse(encryptedText);
+                                    if (data && data.treatments) {
+                                        combinedTreatments = [...combinedTreatments, ...data.treatments];
+                                    }
+                                } catch (err) {}
+                            }
                         }
                     }
                 } catch (err) {

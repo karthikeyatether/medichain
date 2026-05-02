@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Container, Row, Col, Form, Button, Alert } from 'react-bootstrap';
 import { useNavigate, Link } from 'react-router-dom';
+import { useWeb3 } from '../Web3Context';
 
 const roleOptions = [
   { value: '1', label: 'Patient',  icon: '👤', desc: 'Manage health records & insurance', color: '#6366f1' },
@@ -8,7 +9,8 @@ const roleOptions = [
   { value: '3', label: 'Insurer',  icon: '🛡️', desc: 'Create policies & review claims',  color: '#8b5cf6' },
 ];
 
-const Register = ({ mediChain, setToken, setAccount, connectWallet, account }) => {
+const Register = () => {
+  const { mediChain, setToken, setAccount, connectWallet, account } = useWeb3();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
