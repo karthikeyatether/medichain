@@ -38,6 +38,7 @@ const Patient = () => {
   // Cover tracking (original cover for progress bar)
   const [originalCover, setOriginalCover] = useState(null);
   const [txPending, setTxPending] = useState(false);
+  const [recordsLoading, setRecordsLoading] = useState(false);
 
   const handleDataError = (err) => {
     console.error("Dashboard failed to load data:", err);
@@ -208,6 +209,8 @@ const Patient = () => {
 
   const handleCloseRecordModal = () => setShowRecordModal(false);
   const handleShowRecordModal = async () => {
+    setRecordsLoading(true);
+    setShowRecordModal(true);
     let combinedTreatments = [];
     if (patient.records && patient.records.length > 0) {
       await Promise.all(patient.records.map(async (hash) => {
@@ -236,6 +239,8 @@ const Patient = () => {
                   }
                 } catch (err) {}
               }
+            } else {
+              console.warn(`IPFS fetch failed (${res.status}) for record ${hash.slice(0,8)}...`);
             }
           }
         } catch (e) {
@@ -249,7 +254,7 @@ const Patient = () => {
       address: account,
       treatments: combinedTreatments.reverse()
     });
-    setShowRecordModal(true);
+    setRecordsLoading(false);
   }
 
   // Derived expiry info
@@ -627,32 +632,40 @@ const Patient = () => {
       </Modal>
 
       {/* Medical Records Modal */}
-      {patientRecord && (
-        <Modal id="modal" size="xl" centered show={showRecordModal} onHide={handleCloseRecordModal} contentClassName="glass-card border-0">
-          <Modal.Header closeButton className="border-0">
-            <Modal.Title className="text-primary fw-bold">Medical Records</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <Row className="mb-4">
-              <Col md={3}><strong className="text-muted">Name:</strong> {patientRecord.name}</Col>
-              <Col md={3}><strong className="text-muted">Age:</strong> {patientRecord.age}</Col>
-              <Col md={6}><strong className="text-muted">Address:</strong> {patientRecord.address}</Col>
-            </Row>
-
-            <div className="d-flex justify-content-between align-items-center mb-3 text-secondary border-bottom pb-2">
-              <h5 className="mb-0">Treatment Timeline</h5>
-              <Button variant="outline-dark" size="sm" className="rounded-pill" onClick={() => window.print()}>
-                Print Report 🖨️
-              </Button>
+      <Modal id="modal" size="xl" centered show={showRecordModal} onHide={handleCloseRecordModal} contentClassName="glass-card border-0">
+        <Modal.Header closeButton className="border-0">
+          <Modal.Title className="text-primary fw-bold">Medical Records</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {recordsLoading ? (
+            <div className="records-loading">
+              <div className="spinner-border" style={{ color: 'var(--brand-500)' }} role="status" />
+              <span>Fetching records from IPFS...</span>
             </div>
+          ) : (
+            <>
+              {patientRecord && (
+                <Row className="mb-4">
+                  <Col md={3}><strong className="text-muted">Name:</strong> {patientRecord.name}</Col>
+                  <Col md={3}><strong className="text-muted">Age:</strong> {patientRecord.age}</Col>
+                  <Col md={6}><strong className="text-muted">Address:</strong> {patientRecord.address}</Col>
+                </Row>
+              )}
+              <div className="d-flex justify-content-between align-items-center mb-3 text-secondary border-bottom pb-2">
+                <h5 className="mb-0">Treatment Timeline</h5>
+                <Button variant="outline-secondary" size="sm" className="rounded-pill" onClick={() => window.print()}>
+                  Print Report 🖨️
+                </Button>
+              </div>
+              <Timeline treatments={patientRecord?.treatments || []} />
+            </>
+          )}
+        </Modal.Body>
+        <Modal.Footer className="border-0">
+          <Button variant="secondary" onClick={handleCloseRecordModal} className="rounded-pill">Close</Button>
+        </Modal.Footer>
+      </Modal>
 
-            <Timeline treatments={patientRecord.treatments} />
-          </Modal.Body>
-          <Modal.Footer className="border-0">
-            <Button variant="secondary" onClick={handleCloseRecordModal} className="rounded-pill">Close</Button>
-          </Modal.Footer>
-        </Modal>
-      )}
     </div>
   )
 }

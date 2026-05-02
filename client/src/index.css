@@ -804,4 +804,162 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--brand-500); }
 .blob { position: absolute; filter: blur(70px); z-index: 0; opacity: 0.35; animation: float 10s ease-in-out infinite; }
 .blob-1 { top: -100px; left: -100px; width: 500px; height: 500px; background: linear-gradient(135deg, rgba(99,102,241,0.5) 0%, rgba(79,70,229,0.5) 100%); border-radius: 30% 70% 70% 30% / 30% 30% 70% 70%; }
 .blob-2 { bottom: -100px; right: -100px; width: 600px; height: 600px; background: linear-gradient(135deg, rgba(6,182,212,0.5) 0%, rgba(8,145,178,0.5) 100%); border-radius: 70% 30% 30% 70% / 70% 70% 30% 30%; animation-delay: -5s; }
-.auth-card { position: relative; z-index: 1; }
+/* ============================================================
+   Dark Mode — Bootstrap Modal Full Override
+   ============================================================ */
+
+/* Modal backdrop darker */
+.dark-theme .modal-backdrop { background-color: #000; }
+
+/* Modal dialog — full dark surface */
+.dark-theme .modal-content,
+.dark-theme .modal-content.glass-card {
+  background: #0e1117 !important;
+  border: 1px solid rgba(99,102,241,0.25) !important;
+  color: #f1f5f9 !important;
+}
+
+/* Modal header / footer borders */
+.dark-theme .modal-header,
+.dark-theme .modal-footer {
+  border-color: rgba(99,102,241,0.15) !important;
+}
+
+/* All text inside modals in dark mode */
+.dark-theme .modal-body p,
+.dark-theme .modal-body small,
+.dark-theme .modal-body span,
+.dark-theme .modal-body label,
+.dark-theme .modal-body li,
+.dark-theme .modal-body td,
+.dark-theme .modal-body th {
+  color: #cbd5e1 !important;
+}
+
+.dark-theme .modal-body strong,
+.dark-theme .modal-body b {
+  color: #f1f5f9 !important;
+}
+
+/* bg-light panels inside modals (e.g. confirm details box) */
+.dark-theme .modal-body .bg-light,
+.dark-theme .bg-light {
+  background: rgba(99,102,241,0.08) !important;
+  border: 1px solid rgba(99,102,241,0.15) !important;
+}
+
+.dark-theme .modal-body .bg-light .text-muted,
+.dark-theme .bg-light .text-muted,
+.dark-theme .text-muted {
+  color: #94a3b8 !important;
+}
+
+/* Alert inside modal */
+.dark-theme .modal-body .alert-info {
+  background: rgba(6,182,212,0.1) !important;
+  border-color: rgba(6,182,212,0.2) !important;
+  color: #67e8f9 !important;
+}
+
+/* Close button (X) in modal header */
+.dark-theme .btn-close {
+  filter: invert(1) grayscale(100%) brightness(200%);
+}
+
+/* ============================================================
+   Dark Mode — Dashboard Cards & Tables
+   ============================================================ */
+
+/* All p/span/small text on the dashboard */
+.dark-theme .glass-card p,
+.dark-theme .glass-card span,
+.dark-theme .glass-card small {
+  color: var(--text-secondary);
+}
+
+.dark-theme .glass-card strong,
+.dark-theme .glass-card b {
+  color: var(--text-primary) !important;
+}
+
+/* bg-light stat boxes in dashboard (e.g. Active Patients counter) */
+.dark-theme .bg-light {
+  background: rgba(255,255,255,0.04) !important;
+  border: 1px solid rgba(99,102,241,0.12) !important;
+}
+
+/* Table rows */
+.dark-theme .custom-table td {
+  color: #cbd5e1 !important;
+}
+
+/* Spinner */
+.dark-theme .spinner-border { color: var(--brand-500) !important; }
+
+/* ============================================================
+   Dark Mode — File Input
+   ============================================================ */
+.dark-theme input[type="file"].form-control {
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  border-color: rgba(99,102,241,0.2);
+}
+.dark-theme input[type="file"].form-control::file-selector-button {
+  background: rgba(99,102,241,0.15);
+  color: var(--brand-400);
+  border: 1px solid rgba(99,102,241,0.3);
+  border-radius: var(--r-sm);
+  padding: 0.3rem 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.dark-theme input[type="file"].form-control::file-selector-button:hover {
+  background: rgba(99,102,241,0.25);
+}
+
+/* ============================================================
+   Dark Mode — Alert variants
+   ============================================================ */
+.dark-theme .alert-danger {
+  background: rgba(239,68,68,0.1) !important;
+  border-color: rgba(239,68,68,0.25) !important;
+  color: #fca5a5 !important;
+}
+.dark-theme .alert-success {
+  background: rgba(16,185,129,0.1) !important;
+  border-color: rgba(16,185,129,0.25) !important;
+  color: #6ee7b7 !important;
+}
+
+/* ============================================================
+   Timeline Dark Mode
+   ============================================================ */
+.dark-theme .timeline-content {
+  background: rgba(30, 41, 59, 0.4) !important;
+  border: 1px solid rgba(99,102,241,0.25) !important;
+}
+
+/* ============================================================
+   Records Loading State
+   ============================================================ */
+.records-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 3rem 0;
+  gap: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* ============================================================
+   Dark Mode — Outline Buttons
+   ============================================================ */
+.dark-theme .btn-outline-secondary {
+  color: #cbd5e1 !important;
+  border-color: rgba(203, 213, 225, 0.3) !important;
+}
+.dark-theme .btn-outline-secondary:hover {
+  background: rgba(203, 213, 225, 0.1) !important;
+  color: #f1f5f9 !important;
+}

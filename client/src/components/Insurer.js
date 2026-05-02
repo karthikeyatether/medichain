@@ -442,7 +442,7 @@ const Insurer = () => {
                     <Modal.Body>
                         <div className="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
                             <h5 className="text-secondary mb-0">Diagnosis &amp; Treatment History</h5>
-                            <Button variant="outline-dark" size="sm" className="rounded-pill" onClick={() => window.print()}>
+                            <Button variant="outline-secondary" size="sm" className="rounded-pill" onClick={() => window.print()}>
                                 Print Report 🖨️
                             </Button>
                         </div>

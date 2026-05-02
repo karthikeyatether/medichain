@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import 'bootstrap/dist/css/bootstrap.css';
 import { Form, Button, Table, Modal, Row, Col, Badge } from 'react-bootstrap';
-import { Link } from 'react-router-dom';
 import { Buffer } from 'buffer';
 import { useToast } from './ToastContext';
 import Wallet from './Wallet';
+import Timeline from './Timeline';
 import { useWeb3 } from '../Web3Context';
 import { pinataUploadText, pinataUploadFile } from '../Web3Context';
 import CryptoJS from 'crypto-js';
+import { encryptFile } from '../cryptoUtils';
 
 const SECRET_KEY = process.env.REACT_APP_ENCRYPTION_SECRET || 'medichain-secure-key-2026';
 
@@ -20,7 +21,7 @@ const Doctor = () => {
   const [disease, setDisease] = useState('');
   const [treatment, setTreatment] = useState('');
   const [charges, setCharges] = useState('');
-  const [fileBuffer, setFileBuffer] = useState(null);
+  const [fileArrayBuffer, setFileArrayBuffer] = useState(null);
   const [fileName, setFileName] = useState(null);
   const [patList, setPatList] = useState([]);
   const [showModal, setShowModal] = useState(false);
@@ -29,6 +30,7 @@ const Doctor = () => {
   const [transactionsList, setTransactionsList] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [recordsLoading, setRecordsLoading] = useState(false);
 
   const handleDataError = (err) => {
     console.error("Dashboard failed to load data:", err);
@@ -79,7 +81,7 @@ const Doctor = () => {
     const reader = new window.FileReader();
     reader.readAsArrayBuffer(file);
     reader.onloadend = () => {
-      setFileBuffer(Buffer(reader.result));
+      setFileArrayBuffer(reader.result);
     };
   }
 
@@ -88,7 +90,7 @@ const Doctor = () => {
     setDisease('');
     setTreatment('');
     setCharges('');
-    setFileBuffer(null);
+    setFileArrayBuffer(null);
     setFileName(null);
   };
   const handleCloseRecordModal = () => setShowRecordModal(false);
@@ -97,6 +99,8 @@ const Doctor = () => {
     await setShowModal(true);
   }
   const handleShowRecordModal = async (patient) => {
+    setRecordsLoading(true);
+    setShowRecordModal(true);
     let combinedTreatments = [];
     if (patient.records && patient.records.length > 0) {
       await Promise.all(patient.records.map(async (hash) => {
@@ -112,14 +116,12 @@ const Doctor = () => {
             if (res.ok) {
               const encryptedText = await res.text();
               try {
-                // Try to decrypt the JSON payload
                 const bytes = CryptoJS.AES.decrypt(encryptedText, SECRET_KEY);
                 const decryptedData = JSON.parse(bytes.toString(CryptoJS.enc.Utf8));
                 if (decryptedData && decryptedData.treatments) {
                   combinedTreatments = [...combinedTreatments, ...decryptedData.treatments];
                 }
               } catch (e) {
-                // Fallback for old plaintext JSON records
                 try {
                   const data = JSON.parse(encryptedText);
                   if (data && data.treatments) {
@@ -127,6 +129,8 @@ const Doctor = () => {
                   }
                 } catch (err) { }
               }
+            } else {
+              console.warn(`IPFS fetch failed (${res.status}) for record ${hash.slice(0,8)}...`);
             }
           }
         } catch (e) {
@@ -135,7 +139,7 @@ const Doctor = () => {
       }));
     }
     setPatientRecord({ name: patient.name, treatments: combinedTreatments.reverse() });
-    setShowRecordModal(true);
+    setRecordsLoading(false);
   }
 
   const handleDiagnoseClick = (e) => {
@@ -152,10 +156,14 @@ const Doctor = () => {
     setSubmitting(true);
     try {
       let prescriptionCid = '';
-      if (fileBuffer && fileName) {
+      if (fileArrayBuffer && fileName) {
         try {
-          prescriptionCid = await pinataUploadFile(fileBuffer, fileName);
-          addToast('Prescription uploaded to IPFS ✅', 'info');
+          // Encrypt file securely with high-performance Web Crypto API
+          const encryptedBlob = await encryptFile(fileArrayBuffer, SECRET_KEY);
+          
+          // Upload the encrypted binary blob to Pinata
+          prescriptionCid = await pinataUploadFile(encryptedBlob, fileName + '.enc');
+          addToast('High-resolution file encrypted & uploaded ✅', 'info');
         } catch (error) {
           console.error('IPFS Prescription Upload Error:', error);
           addToast('Prescription upload failed, continuing without it.', 'warning');
@@ -422,6 +430,21 @@ const Doctor = () => {
               </Form.Text>
             </Form.Group>
 
+            <Form.Group className='mb-4'>
+              <Form.Label className="text-muted fw-bold">Prescription / Report <span className="text-muted fw-normal">(optional — PDF, image)</span></Form.Label>
+              <Form.Control
+                type="file"
+                accept=".pdf,.png,.jpg,.jpeg,.webp"
+                onChange={captureFile}
+                className="form-control"
+              />
+              {fileName && (
+                <Form.Text className="text-success">
+                  📎 {fileName} selected — will upload to IPFS
+                </Form.Text>
+              )}
+            </Form.Group>
+
             <div className="d-grid gap-2">
               <Button type="submit" variant="primary" className="rounded-pill btn-primary py-2 text-uppercase fw-bold" disabled={submitting}>
                 {submitting ? '⏳ Submitting to Blockchain...' : 'Review & Submit Diagnosis'}
@@ -457,45 +480,23 @@ const Doctor = () => {
       </Modal>
 
       {/* Records Modal */}
-      {patientRecord && (
-        <Modal size="xl" centered show={showRecordModal} onHide={handleCloseRecordModal} contentClassName="glass-card border-0">
-          <Modal.Header closeButton className="border-0">
-            <Modal.Title className="text-primary fw-bold">Medical History: {patientRecord.name}</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <Table className="custom-table align-middle">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Doctor</th>
-                  <th>Disease</th>
-                  <th>Treatment</th>
-                  <th>Rx</th>
-                </tr>
-              </thead>
-              <tbody>
-                {patientRecord.treatments.length > 0 ?
-                  patientRecord.treatments.map((treatment, idx) => (
-                    <tr key={idx}>
-                      <td>{treatment.date}</td>
-                      <td>{treatment.doctorEmail}</td>
-                      <td><Badge bg="info">{treatment.disease}</Badge></td>
-                      <td>{treatment.treatment}</td>
-                      <td>
-                        {treatment.prescription ?
-                          <Button as={Link} to={`${process.env.REACT_APP_INFURA_DEDICATED_GATEWAY}/ipfs/${treatment.prescription}`} target="_blank" variant="outline-primary" size="sm" className="rounded-pill">View</Button>
-                          : <span className="text-muted">-</span>
-                        }
-                      </td>
-                    </tr>
-                  ))
-                  : <tr><td colSpan="5" className="text-center">No previous records</td></tr>
-                }
-              </tbody>
-            </Table>
-          </Modal.Body>
-        </Modal>
-      )}
+      <Modal size="xl" centered show={showRecordModal} onHide={handleCloseRecordModal} contentClassName="glass-card border-0">
+        <Modal.Header closeButton className="border-0">
+          <Modal.Title className="text-primary fw-bold">
+            Medical History: {patientRecord?.name || '...'}
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {recordsLoading ? (
+            <div className="records-loading">
+              <div className="spinner-border" style={{ color: 'var(--brand-500)' }} role="status" />
+              <span>Fetching records from IPFS...</span>
+            </div>
+          ) : (
+            <Timeline treatments={patientRecord?.treatments || []} />
+          )}
+        </Modal.Body>
+      </Modal>
     </div>
   )
 }
