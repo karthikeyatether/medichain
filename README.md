@@ -34,27 +34,26 @@ Before running the project, ensure you have the following installed:
 1.  **Clone the Repository**
     ```bash
     git clone https://github.com/karthikeyatether/medichain.git
-    cd mediChain
+    cd medichain
     ```
 
-3.  **Install Dependencies**
+2.  **Install Dependencies**
     ```bash
     npm install
     npm run client:install
     npm run truffle:install
     ```
 
-4.  **Start Ganache**
+3.  **Start Ganache**
     *   Open **Ganache** and create a new workspace (or use Quickstart).
     *   Ensure Ganache is running on `127.0.0.1:7545` (default).
 
-5.  **Deploy Contracts & Start App**
+4.  **Deploy Contracts & Start App**
     ```bash
     npm run truffle:migrate
     npm run client:start
     ```
-    This will deploy the smart contracts and launch the React application at `http://localhost:3000`.
-    This will compile and deploy the `MediChain` contract to your local blockchain.
+    This will compile smart contracts and launch the React application at `http://localhost:3000`.
 
 ## System Model
 
