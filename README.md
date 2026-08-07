@@ -1,104 +1,116 @@
 # MediChain
 
-MediChain is a decentralized application (dApp) designed to revolutionize the management of medical records using blockchain technology. By leveraging the Ethereum blockchain and IPFS for storage, MediChain ensures that medical data is secure, immutable, and easily accessible to authorized parties such as patients, doctors, and insurers.
+> A local Ethereum dApp prototype for role-based medical-record access, insurance workflows, and provider payments.
 
-## Features
+MediChain explores how patients, doctors, and insurers could coordinate around medical-record references and insurance claims using wallet-based identity, Solidity smart contracts, and IPFS-compatible content addressing.
 
--   **Decentralized Record Storage**: Medical records are stored securely on IPFS, with references recorded on the Ethereum blockchain.
--   **Role-Based Access Control**:
-    -   **Patients**: Have full control over their medical history and can grant access to doctors.
-    -   **Doctors**: Can view patient records and add new entries upon authorization.
-    -   **Insurers**: Can verify claims and view transaction histories transparently.
--   **Secure Authentication**: Uses Metamask for wallet-based authentication, ensuring secure identity management.
--   **Real-Time Currency Conversion**: Integrated with Coinbase API to display Ethereum values in INR for better usability.
+This is an educational prototype for local development. It is not a production healthcare system, medical device, or recommendation for storing real patient data on a public blockchain.
 
-## Technology Stack
+## What the prototype demonstrates
 
--   **Frontend**: React.js, React Bootstrap
--   **Blockchain**: Ethereum (Solidity), Truffle Suite, Ganache
--   **Web3 Integration**: Web3.js
--   **Storage**: IPFS (via Infura)
--   **Styling**: Custom CSS, Bootstrap 5
+- Patient, doctor, and insurer registration with wallet-linked roles.
+- Patient-controlled doctor access with grant and revoke flows.
+- Medical-record references represented as content hashes.
+- Insurance policy creation, purchase, renewal, and claim workflows.
+- Claim approval/rejection and provider payment settlement.
+- Pull-based withdrawals guarded by OpenZeppelin `ReentrancyGuard`.
+- UUPS upgradeable contract structure with owner-controlled upgrades.
+- React dashboard with Web3 wallet integration and role-specific views.
+- Local development diagrams for the contract and patient interaction flow.
 
-## Prerequisites
+## Architecture
 
-Before running the project, ensure you have the following installed:
-
--   [Node.js](https://nodejs.org/) (v14 or higher recommended)
--   [Truffle](https://www.trufflesuite.com/truffle) (`npm install -g truffle`)
--   [Ganache](https://trufflesuite.com/ganache/) (Personal Blockchain)
--   [Metamask](https://metamask.io/) Browser Extension
-
-## Installation and Setup
-
-1.  **Clone the Repository**
-    ```bash
-    git clone https://github.com/karthikeyatether/medichain.git
-    cd medichain
-    ```
-
-2.  **Install Dependencies**
-    ```bash
-    npm install
-    npm run client:install
-    npm run truffle:install
-    ```
-
-3.  **Start Ganache**
-    *   Open **Ganache** and create a new workspace (or use Quickstart).
-    *   Ensure Ganache is running on `127.0.0.1:7545` (default).
-
-4.  **Deploy Contracts & Start App**
-    ```bash
-    npm run truffle:migrate
-    npm run client:start
-    ```
-    This will compile smart contracts and launch the React application at `http://localhost:3000`.
-
-## System Model
-
-### Class Diagram
-The application architecture is centered around the `MediChain` smart contract, which manages the state and interactions between Patients, Doctors, and Insurers.
-
-![Class Diagram](client/public/assets/diagrams/class_diagram.png)
-
-### Activity Diagram: Patient Interaction
-This diagram illustrates the process of user authentication and interaction with the MediChain system.
-
-![Activity Diagram](client/public/assets/diagrams/activity_diagram.png)
-
-## Running the Application
-
-You can start the application using the provided batch script or manually.
-
-### Option 1: Using the Batch Script (Windows)
-Simply double-click `run_project.bat` in the root directory, or run it from the command line:
-```bash
-.\run_project.bat
+```text
+React client
+    |
+    +-- Web3.js / MetaMask
+    |
+Local Ethereum network (Ganache)
+    |
+MediChain.sol
+    |
+    +-- role registry and access mappings
+    +-- insurance policies and claims
+    +-- payment balances and withdrawals
+    +-- IPFS/content-hash references
 ```
-Follow the on-screen menu to deploy contracts or start the client.
 
-### Option 2: Manual Start
-1.  **Deploy Contracts** (if not already done):
-    ```bash
-    cd truffle
-    truffle migrate
-    ```
-2.  **Start the Client**:
-    ```bash
-    cd ../client
-    npm start
-    ```
-3.   The application will open in your browser at `http://localhost:3000`.
+The smart contract is in `truffle/contracts/MediChain.sol`. The client is in `client/`, and the local blockchain project is in `truffle/`.
 
-## Usage
+## Technology
 
-1.  **Login/Register**: Connect your Metamask wallet. The app detects your role or prompts you to register if you are a new user.
-2.  **Dashboard**:
-    *   **Patients**: View your records, upload new documents.
-    *   **Doctors**: Access assigned patient records.
-    *   **Insurers**: Validate policies and transactions.
+- React 18 and React Bootstrap
+- Web3.js and MetaMask
+- Solidity `^0.8.20`
+- Truffle and Ganache
+- OpenZeppelin Contracts and upgradeable contracts
+- IPFS-compatible storage integration
+- Node.js and npm
+
+## Run the local demo
+
+### Requirements
+
+- Node.js 18 or newer
+- npm
+- Ganache
+- MetaMask browser extension
+- Truffle CLI, or use the repository scripts
+
+### Install
+
+```bash
+git clone https://github.com/karthikeyatether/medichain.git
+cd medichain
+
+npm install
+npm run client:install
+npm run truffle:install
+```
+
+### Start Ganache
+
+Start a local Ganache workspace on `127.0.0.1:7545`, then connect MetaMask to that network and import a development account.
+
+### Compile, deploy, and start
+
+```bash
+npm run truffle:compile
+npm run truffle:migrate
+npm run client:start
+```
+
+The client runs at `http://localhost:3000`.
+
+On Windows, `run_project.bat` provides the same local workflow.
+
+### Contract tests
+
+```bash
+npm run truffle:test
+```
+
+## Project structure
+
+```text
+client/
+  src/                 React application and role-specific views
+  public/assets/       diagrams and static assets
+truffle/
+  contracts/           Solidity contract
+  migrations/          deployment scripts
+  test/                contract tests
+  truffle-config.js    local network configuration
+```
+
+## Security and privacy limitations
+
+- Do not use real patient information, wallet keys, or production funds.
+- Medical data should not be placed directly on-chain.
+- IPFS hashes can still reveal relationships and metadata.
+- The local network and development configuration are not production hardened.
+- A security review, privacy threat model, access audit, and deployment review are required before any real-world use.
 
 ## License
 
-This project is licensed under the MIT License.
+This project is distributed under the [MIT License](LICENSE).

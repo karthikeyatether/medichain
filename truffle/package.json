@@ -1,7 +1,7 @@
 {
-  "name": "truffle-project",
+  "name": "medichain-contracts",
   "version": "0.1.0",
-  "description": "Truffle project with SimpleStorage contract",
+  "description": "Solidity contracts and local deployment scripts for MediChain",
   "scripts": {
     "compile": "truffle compile",
     "migrate": "truffle migrate --reset",

@@ -1,7 +1,7 @@
 {
-  "name": "gfg-enigma",
+  "name": "medichain",
   "version": "1.0.0",
-  "description": "",
+  "description": "Local Ethereum dApp prototype for medical-record access, insurance workflows, and provider payments.",
   "scripts": {
     "client:install": "npm install --prefix client",
     "client:start": "npm start --prefix client",
@@ -12,12 +12,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Karan9034/gfg-enigma.git"
+    "url": "git+https://github.com/karthikeyatether/medichain.git"
   },
   "author": "Karan Agrawal",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/Karan9034/gfg-enigma/issues"
+    "url": "https://github.com/karthikeyatether/medichain/issues"
   },
-  "homepage": "https://github.com/Karan9034/gfg-enigma#readme"
+  "homepage": "https://github.com/karthikeyatether/medichain#readme"
 }
