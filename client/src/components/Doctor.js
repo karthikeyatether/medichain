@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import 'bootstrap/dist/css/bootstrap.css';
 import { Form, Button, Table, Modal, Row, Col, Badge } from 'react-bootstrap';
-import { Buffer } from 'buffer';
 import { useToast } from './ToastContext';
 import Wallet from './Wallet';
 import Timeline from './Timeline';

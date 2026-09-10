@@ -10,7 +10,7 @@ const roleOptions = [
 ];
 
 const Login = () => {
-  const { mediChain, setToken, setAccount, connectWallet, account } = useWeb3();
+  const { mediChain, setToken, connectWallet, account } = useWeb3();
   const [role, setRole] = useState('1');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');

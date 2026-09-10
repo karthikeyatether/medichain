@@ -5,13 +5,14 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
 /**
  * @title MediChain
  * @notice Decentralized medical records, insurance, and payment management on Ethereum.
- * @dev Uses pull-over-push payment pattern (ReentrancyGuard) for secure withdrawals.
+ * @dev Uses pull-over-push payment pattern (ReentrancyGuard) for secure withdrawals and Pausable for emergency stops.
  */
-contract MediChain is Initializable, ReentrancyGuard, UUPSUpgradeable, OwnableUpgradeable {
+contract MediChain is Initializable, ReentrancyGuard, UUPSUpgradeable, OwnableUpgradeable, PausableUpgradeable {
 
     // ─────────────────────────────────────────────
     // State Variables
@@ -148,6 +149,7 @@ contract MediChain is Initializable, ReentrancyGuard, UUPSUpgradeable, OwnableUp
 
     function initialize() public initializer {
         __Ownable_init(msg.sender);
+        __Pausable_init();
 
         name = "MediChain";
         claimsCount = 0;
@@ -155,6 +157,20 @@ contract MediChain is Initializable, ReentrancyGuard, UUPSUpgradeable, OwnableUp
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+
+    /**
+     * @notice Emergency stop circuit breaker: pauses deposits, claims, and withdrawals.
+     */
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    /**
+     * @notice Resumes operations once the issue or incident is resolved.
+     */
+    function unpause() external onlyOwner {
+        _unpause();
+    }
 
     // ─────────────────────────────────────────────
     // Registration
@@ -280,7 +296,7 @@ contract MediChain is Initializable, ReentrancyGuard, UUPSUpgradeable, OwnableUp
     /**
      * @notice Purchase an insurance policy. Premiums go to insurer's withdrawal balance.
      */
-    function buyPolicy(uint _id) external payable onlyPatient nonReentrant {
+    function buyPolicy(uint _id) external payable onlyPatient whenNotPaused nonReentrant {
         require(_id < policyList.length,           "Invalid policy ID");
         require(!patientInfo[msg.sender].policyActive ||
                 block.timestamp > patientInfo[msg.sender].policyExpiry,
@@ -296,7 +312,8 @@ contract MediChain is Initializable, ReentrancyGuard, UUPSUpgradeable, OwnableUp
     /**
      * @notice Settle an out-of-pocket transaction (when not covered by insurance).
      */
-    function settleTransactionsByPatient(uint _id) external payable onlyPatient nonReentrant {
+    function settleTransactionsByPatient(uint _id) external payable onlyPatient whenNotPaused nonReentrant {
+        require(_id > 0 && _id <= transactionCount,     "Invalid transaction ID");
         require(msg.sender == transactions[_id].sender, "Not your transaction");
         require(!transactions[_id].settled,             "Already settled");
         require(msg.value > 0,                          "Must send ETH");
@@ -312,7 +329,7 @@ contract MediChain is Initializable, ReentrancyGuard, UUPSUpgradeable, OwnableUp
     /**
      * @notice Renew an expired or inactive insurance policy.
      */
-    function renewPolicy(uint _id) external payable onlyPatient nonReentrant {
+    function renewPolicy(uint _id) external payable onlyPatient whenNotPaused nonReentrant {
         require(_id < policyList.length,  "Invalid policy ID");
         require(
             !patientInfo[msg.sender].policyActive ||
@@ -340,7 +357,7 @@ contract MediChain is Initializable, ReentrancyGuard, UUPSUpgradeable, OwnableUp
         address paddr,
         string  memory _hash,
         uint    charges
-    ) external onlyDoctor hasAccessTo(paddr) {
+    ) external onlyDoctor hasAccessTo(paddr) whenNotPaused {
         require(patientInfo[paddr].exists,   "Patient not found");
         require(bytes(_hash).length > 0,     "Record hash required");
         require(charges > 0,                 "Charges must be > 0");
@@ -398,7 +415,7 @@ contract MediChain is Initializable, ReentrancyGuard, UUPSUpgradeable, OwnableUp
         uint _coverValue,
         uint _timePeriod,
         uint _premium
-    ) external onlyInsurer {
+    ) external onlyInsurer whenNotPaused {
         require(bytes(_name).length > 0, "Policy name required");
         require(_coverValue > 0,         "Cover value must be > 0");
         require(_premium    > 0,         "Premium must be > 0");
@@ -413,7 +430,8 @@ contract MediChain is Initializable, ReentrancyGuard, UUPSUpgradeable, OwnableUp
     /**
      * @notice Approve an insurance claim — funds transferred to doctor.
      */
-    function approveClaimsByInsurer(uint _id) external payable onlyInsurer nonReentrant {
+    function approveClaimsByInsurer(uint _id) external payable onlyInsurer whenNotPaused nonReentrant {
+        require(_id > 0 && _id <= claimsCount,     "Invalid claim ID");
         require(msg.sender == claims[_id].insurer, "Not your claim");
         require(!claims[_id].approved,             "Already approved");
         require(!claims[_id].rejected,             "Already rejected");
@@ -429,7 +447,8 @@ contract MediChain is Initializable, ReentrancyGuard, UUPSUpgradeable, OwnableUp
     /**
      * @notice Reject an insurance claim — cover value restored to patient.
      */
-    function rejectClaimsByInsurer(uint _id) external onlyInsurer {
+    function rejectClaimsByInsurer(uint _id) external onlyInsurer whenNotPaused {
+        require(_id > 0 && _id <= claimsCount,     "Invalid claim ID");
         require(msg.sender == claims[_id].insurer, "Not your claim");
         require(!claims[_id].approved,             "Already approved");
         require(!claims[_id].rejected,             "Already rejected");
@@ -439,10 +458,10 @@ contract MediChain is Initializable, ReentrancyGuard, UUPSUpgradeable, OwnableUp
         transactions[claims[_id].transactionId].sender = claims[_id].patient;
         patientInfo[claims[_id].patient].transactions.push(claims[_id].transactionId);
 
-        // Restore cover value
+        // Restore cover value only if policy expiry has not passed
         Policy storage pol = patientInfo[claims[_id].patient].policy;
         pol.coverValue += claims[_id].valueClaimed;
-        if (!patientInfo[claims[_id].patient].policyActive) {
+        if (!patientInfo[claims[_id].patient].policyActive && block.timestamp <= patientInfo[claims[_id].patient].policyExpiry) {
             patientInfo[claims[_id].patient].policyActive = true;
         }
         emit ClaimRejected(_id);
@@ -456,7 +475,7 @@ contract MediChain is Initializable, ReentrancyGuard, UUPSUpgradeable, OwnableUp
      * @notice Withdraw accumulated earnings to your wallet.
      * @dev Pull-over-push pattern prevents reentrancy attacks.
      */
-    function withdraw() external nonReentrant {
+    function withdraw() external whenNotPaused nonReentrant {
         uint amount = pendingWithdrawals[msg.sender];
         require(amount > 0, "No funds to withdraw");
         pendingWithdrawals[msg.sender] = 0;  // Zero before transfer (CEI pattern)
@@ -481,7 +500,18 @@ contract MediChain is Initializable, ReentrancyGuard, UUPSUpgradeable, OwnableUp
         p.policy.premium    = src.premium;
         p.policyActive      = true;
         p.policyExpiry      = block.timestamp + (src.timePeriod * 365 days);
-        insurerInfo[src.insurer].patients.push(patient);
+
+        bool alreadyTracked = false;
+        address[] storage pats = insurerInfo[src.insurer].patients;
+        for (uint i = 0; i < pats.length; i++) {
+            if (pats[i] == patient) {
+                alreadyTracked = true;
+                break;
+            }
+        }
+        if (!alreadyTracked) {
+            pats.push(patient);
+        }
     }
 
     /// @dev Creates a new transaction record and pushes ID to doctor.

@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import 'bootstrap/dist/css/bootstrap.css';
 import { Form, Button, Table, Modal, Row, Col, Badge, ProgressBar } from 'react-bootstrap';
-import { Link } from 'react-router-dom';
 import Timeline from './Timeline';
 import Web3 from 'web3';
 
@@ -62,7 +61,8 @@ const Patient = () => {
       .on('transactionHash', () => {
         addToast("Doctor access granted successfully!", "success");
         setTxPending(false);
-        setTimeout(() => window.location.href = '/login', 1500);
+        setDocEmail('');
+        getDoctorAccessList();
       })
       .on('error', (err) => {
         addToast("Failed to grant access: " + (err.message || "Unknown error"), "danger");
@@ -84,7 +84,7 @@ const Patient = () => {
         .on('transactionHash', () => {
           addToast("Doctor access revoked.", "warning");
           setTxPending(false);
-          setTimeout(() => window.location.href = '/login', 1500);
+          getDoctorAccessList();
         })
         .on('error', (err) => {
           addToast("Failed to revoke access.", "danger");
@@ -142,6 +142,7 @@ const Patient = () => {
   }
 
   const confirmPurchasePolicy = async () => {
+    if (buyPolicyIndex === null) return;
     setShowPolicyConfirm(false);
     setTxPending(true);
     var value = policyList[buyPolicyIndex].premium / ethValue;
@@ -151,7 +152,9 @@ const Patient = () => {
       .on('transactionHash', () => {
         addToast("Policy purchased successfully! 🎉", "success");
         setTxPending(false);
-        setTimeout(() => window.location.href = '/login', 1500);
+        getPatientData();
+        getPolicyList();
+        getTransactionsList();
       })
       .on('error', (err) => {
         addToast("Policy purchase failed.", "danger");
@@ -170,7 +173,9 @@ const Patient = () => {
       .on('transactionHash', () => {
         addToast("Policy renewed successfully! 🎉", "success");
         setTxPending(false);
-        setTimeout(() => window.location.href = '/login', 1500);
+        getPatientData();
+        getPolicyList();
+        getTransactionsList();
       })
       .on('error', (err) => {
         addToast("Policy renewal failed: " + (err.message || ""), "danger");

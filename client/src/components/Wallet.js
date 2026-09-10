@@ -32,7 +32,10 @@ const Wallet = ({ mediChain, account, ethValue }) => {
     }
   };
 
-  useEffect(() => { getBalance(); }, [mediChain, account]);
+  useEffect(() => { 
+    getBalance(); 
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mediChain, account]);
 
   const inrValue = (parseFloat(balanceEth) * ethValue).toFixed(0);
   const hasBalance = parseFloat(balanceEth) > 0;

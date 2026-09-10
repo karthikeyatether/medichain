@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import 'bootstrap/dist/css/bootstrap.css';
 import { Form, Button, Modal, Table, Row, Col, Badge } from 'react-bootstrap';
 import Web3 from 'web3';
-import { Link } from 'react-router-dom'
 import SimpleBarChart from './SimpleBarChart';
 import Timeline from './Timeline';
 import Wallet from './Wallet';
@@ -23,8 +22,6 @@ const Insurer = () => {
     const [polCoverValue, setPolCoverValue] = useState('');
     const [polDuration, setPolDuration] = useState('');
     const [polPremium, setPolPremium] = useState('');
-    const [showRecord, setShowRecord] = useState(false);
-    const [claimsIdList, setClaimsIdList] = useState([]);
     const [claimsList, setClaimsList] = useState([]);
     const [transactionsList, setTransactionsList] = useState([]);
     const [showRecordModal, setShowRecordModal] = useState(false);
@@ -43,10 +40,19 @@ const Insurer = () => {
         setPolicyList(pol)
     }
     const createPolicy = (e) => {
-        e.preventDefault()
-        mediChain.methods.createPolicy(polName, polCoverValue, polDuration, polPremium).send({ from: account }).on('transactionHash', (hash) => {
-            return window.location.href = '/login'
-        })
+        e.preventDefault();
+        mediChain.methods.createPolicy(polName, polCoverValue, polDuration, polPremium).send({ from: account })
+            .on('transactionHash', (hash) => {
+                addToast("Policy created successfully! 🎉", "success");
+                setPolName('');
+                setPolCoverValue('');
+                setPolDuration('');
+                setPolPremium('');
+                getPolicyList();
+            })
+            .on('error', (err) => {
+                addToast("Failed to create policy: " + (err.message || "Transaction reverted"), "danger");
+            });
     }
     const handleShowRecordModal = async (e, patient) => {
         let combinedTreatments = [];

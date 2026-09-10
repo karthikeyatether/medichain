@@ -10,7 +10,7 @@ const roleOptions = [
 ];
 
 const Register = () => {
-  const { mediChain, setToken, setAccount, connectWallet, account } = useWeb3();
+  const { mediChain, setToken, connectWallet, account } = useWeb3();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
